@@ -1,0 +1,3029 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHẤM THI TRẮC NGHIỆM THÔNG MINH | PHẠM HẬU -EDU</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Be Vietnam Pro, Inter & Roboto Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Tesseract.js OCR (Hỗ trợ nhận diện chữ số viết tay dự phòng khi không dùng Gemini) -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Be Vietnam Pro', 'Inter', 'Segoe UI', Arial, sans-serif;
+            background-color: #f1f5f9;
+            color: #0f172a;
+            margin: 0;
+            padding: 0;
+        }
+
+        .font-mono-code {
+            font-family: 'Roboto Mono', monospace;
+        }
+
+        /* Thanh cuộn tinh gọn */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Khung chứa Canvas tờ phiếu A4/A5 */
+        #sheetPreviewCanvas {
+            background: #ffffff;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+
+        /* Khu vực in ẩn bình thường, chỉ hiện chuẩn 1:1 khi gọi window.print() */
+        #printOnlyContainer {
+            display: none;
+        }
+
+        @media print {
+            body, html {
+                background: #ffffff !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
+                overflow: visible !important;
+            }
+            #appRoot, #toastBox, #reviewModal {
+                display: none !important;
+            }
+            #printOnlyContainer {
+                display: block !important;
+                width: 100% !important;
+                height: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            #printImage {
+                width: 100%;
+                height: auto;
+                display: block;
+                page-break-after: avoid;
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+    <style id="dynamicPrintStyle">
+        @page {
+            size: A4 portrait;
+            margin: 0;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- VÙNG IN ĐỘC LẬP CHUẨN TỶ LỆ 1:1 -->
+    <div id="printOnlyContainer">
+        <img id="printImage" src="" alt="Phiếu trả lời trắc nghiệm OMR">
+    </div>
+
+    <!-- GIAO DIỆN CHÍNH CỦA ỨNG DỤNG -->
+    <div id="appRoot" class="flex flex-col min-h-screen lg:h-screen lg:overflow-hidden">
+        
+        <!-- HEADER THƯƠNG HIỆU & CHUYỂN TAB -->
+        <header class="bg-[#1e3a8a] text-white shadow-md z-30 shrink-0">
+            <div class="max-w-[1600px] mx-auto px-4 py-2.5 flex flex-col md:flex-row items-center justify-between gap-3">
+                <!-- Logo & Tên hệ thống -->
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-white/15 border border-white/25 flex items-center justify-center shrink-0">
+                        <i data-lucide="scan-line" class="w-6 h-6 text-emerald-300"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h1 class="font-extrabold text-sm sm:text-base tracking-wide uppercase">
+                                CHẤM THI TRẮC NGHIỆM THÔNG MINH
+                            </h1>
+                            <span class="px-2 py-0.5 text-[11px] font-bold bg-amber-400 text-slate-950 rounded-md tracking-wider">
+                                PHẠM HẬU -EDU
+                            </span>
+                        </div>
+                        <p class="text-[11px] text-blue-200 hidden sm:block">
+                            Hệ thống thiết kế phiếu OMR tùy biến &amp; chấm điểm tự động chuẩn tọa độ 100%
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 2 Tab Điều Hướng Lớn & Nút Tải App -->
+                <nav class="flex items-center bg-blue-950/60 p-1 rounded-xl border border-blue-700/60 w-full md:w-auto">
+                    <button id="tabBtn1" type="button" onclick="switchTab(1)"
+                        class="flex-1 md:flex-initial px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition cursor-pointer bg-white text-[#1e3a8a] shadow-sm">
+                        <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                        <span>1. Thiết kế &amp; In Phiếu OMR</span>
+                    </button>
+                    <button id="tabBtn2" type="button" onclick="switchTab(2)"
+                        class="flex-1 md:flex-initial px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition cursor-pointer text-blue-100 hover:text-white">
+                        <i data-lucide="camera" class="w-4 h-4"></i>
+                        <span>2. Chấm Bài &amp; Xuất Điểm</span>
+                    </button>
+                    <button type="button" onclick="downloadStandaloneAppHtml()" title="Tải toàn bộ ứng dụng thành 1 file HTML để mở offline hoặc đưa lên mạng"
+                        class="ml-1 px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer bg-emerald-500 hover:bg-emerald-400 text-slate-950 shrink-0">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                        <span class="hidden sm:inline">Tải App (.HTML)</span>
+                    </button>
+                </nav>
+            </div>
+        </header>
+
+        <!-- =====================================================================
+             TAB 1: THIẾT KẾ & IN PHIẾU OMR TÙY BIẾN
+             ===================================================================== -->
+        <section id="tabContent1" class="flex-1 flex flex-col lg:flex-row lg:overflow-hidden">
+            
+            <!-- CỘT TRÁI (35%): BẢNG ĐIỀU KHIỂN CẤU HÌNH PHIẾU -->
+            <aside class="w-full lg:w-[35%] xl:w-[33%] bg-white border-b lg:border-b-0 lg:border-r border-slate-200 flex flex-col lg:h-full">
+                <div class="p-4 sm:p-5 overflow-y-auto custom-scrollbar flex-1 space-y-5">
+                    
+                    <!-- Khối 1: Mẫu cấu trúc & Tùy chỉnh số câu -->
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-extrabold uppercase tracking-wider text-[#1e3a8a] flex items-center gap-1.5">
+                                <i data-lucide="sliders" class="w-4 h-4"></i> Cấu trúc đề thi &amp; Số câu
+                            </span>
+                            <span id="badgeTotalQ" class="text-[11px] font-bold px-2 py-0.5 rounded bg-blue-50 text-[#1e3a8a] border border-blue-200">
+                                Tổng: 40 câu
+                            </span>
+                        </div>
+
+                        <div>
+                            <label for="presetSelect" class="block text-xs font-semibold text-slate-700 mb-1">Chọn mẫu nhanh hoặc tùy chỉnh</label>
+                            <select id="presetSelect" class="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800 focus:border-[#1e3a8a] focus:bg-white focus:outline-none">
+                                <option value="custom">Tùy chỉnh số câu tự do (Linh hoạt)</option>
+                                <option value="40abcd" selected>Mẫu chuẩn: 40 câu ABCD</option>
+                                <option value="50abcd">Mẫu chuẩn: 50 câu ABCD</option>
+                                <option value="bgd2025">Cấu trúc mới Bộ GD&amp;ĐT (12 ABCD + 4 Đ/S + 6 TLN)</option>
+                            </select>
+                        </div>
+
+                        <!-- Nhập số câu từng phần -->
+                        <div class="grid grid-cols-3 gap-2 pt-1">
+                            <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                                <label for="numPart1" class="block text-[11px] font-bold text-slate-700 mb-1">Phần I (ABCD)</label>
+                                <input type="number" id="numPart1" min="0" max="100" value="40"
+                                    class="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-center font-mono-code font-bold text-sm text-[#1e3a8a] focus:border-[#1e3a8a] focus:outline-none">
+                                <span class="block text-[10px] text-slate-400 text-center mt-0.5">0 – 100 câu</span>
+                            </div>
+
+                            <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                                <label for="numPart2" class="block text-[11px] font-bold text-slate-700 mb-1">Phần II (Đ/S)</label>
+                                <input type="number" id="numPart2" min="0" max="10" value="0"
+                                    class="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-center font-mono-code font-bold text-sm text-[#059669] focus:border-[#1e3a8a] focus:outline-none">
+                                <span class="block text-[10px] text-slate-400 text-center mt-0.5">0 – 10 câu</span>
+                            </div>
+
+                            <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                                <label for="numPart3" class="block text-[11px] font-bold text-slate-700 mb-1">Phần III (TLN)</label>
+                                <input type="number" id="numPart3" min="0" max="10" value="0"
+                                    class="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-center font-mono-code font-bold text-sm text-amber-700 focus:border-[#1e3a8a] focus:outline-none">
+                                <span class="block text-[10px] text-slate-400 text-center mt-0.5">0 – 10 câu</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="border-slate-200">
+
+                    <!-- Khối 2: Khổ giấy & Cấu hình ô Mã đề viết tay -->
+                    <div class="space-y-3">
+                        <span class="text-xs font-extrabold uppercase tracking-wider text-[#1e3a8a] flex items-center gap-1.5">
+                            <i data-lucide="layout-grid" class="w-4 h-4"></i> Khổ giấy thông minh &amp; Ô Mã đề
+                        </span>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <label for="paperSizeSelect" class="block text-xs font-semibold text-slate-700">Chế độ khổ giấy</label>
+                                    <span id="autoPaperBadge" class="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 text-[#059669]">
+                                        Đang dùng: A4
+                                    </span>
+                                </div>
+                                <select id="paperSizeSelect" class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs sm:text-sm font-semibold text-slate-800 focus:border-[#1e3a8a] focus:outline-none">
+                                    <option value="AUTO" selected>Tự động (A5 ít câu / A4 nhiều câu)</option>
+                                    <option value="A5">Ép khổ A5 (148 × 210 mm)</option>
+                                    <option value="A4">Ép khổ A4 (210 × 297 mm)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="examCodeDigitsSelect" class="block text-xs font-semibold text-slate-700 mb-1">Số ô viết Mã đề</label>
+                                <select id="examCodeDigitsSelect" class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs sm:text-sm font-medium text-slate-800 focus:border-[#1e3a8a] focus:outline-none">
+                                    <option value="3" selected>3 ô viết tay (101)</option>
+                                    <option value="4">4 ô viết tay (1001)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Tùy chọn ghép 2 phiếu A5 trên 1 tờ A4 ngang khi ở khổ A5 -->
+                        <div id="twoUpOptionBox" class="hidden p-2.5 rounded-xl bg-amber-50 border border-amber-300 space-y-1.5">
+                            <label class="flex items-center justify-between gap-2 cursor-pointer select-none">
+                                <span class="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                                    <i data-lucide="scissors" class="w-4 h-4 text-amber-700 shrink-0"></i>
+                                    <span>Xếp 2 phiếu A5 trên 1 tờ A4 ngang</span>
+                                </span>
+                                <input type="checkbox" id="twoUpA4Checkbox" checked class="w-4 h-4 rounded accent-[#1e3a8a] cursor-pointer">
+                            </label>
+                            <p class="text-[11px] text-amber-800 leading-snug">
+                                In 2 phiếu song song trên 1 mặt giấy A4 nằm ngang, có đường nét đứt ở giữa để cắt đôi. Mỗi nửa A5 giữ nguyên 4 điểm neo OMR độc lập.
+                            </p>
+                        </div>
+
+                        <div class="p-2.5 rounded-xl bg-emerald-50/80 border border-emerald-200 text-[11px] text-emerald-900 flex items-start gap-2">
+                            <i data-lucide="pen-tool" class="w-4 h-4 text-[#059669] shrink-0 mt-0.5"></i>
+                            <span>Khi ít câu (≤ 32 câu), hệ thống tự chuyển sang <strong>khổ A5 tiết kiệm giấy</strong>. Học sinh viết trực tiếp <strong>Mã đề bằng bút mực</strong> vào khung góc phải.</span>
+                        </div>
+                    </div>
+
+                    <hr class="border-slate-200">
+
+                    <!-- Khối 3: Tiêu đề hành chính trên phiếu -->
+                    <div class="space-y-3">
+                        <span class="text-xs font-extrabold uppercase tracking-wider text-[#1e3a8a] flex items-center gap-1.5">
+                            <i data-lucide="type" class="w-4 h-4"></i> Thông tin tiêu đề phiếu
+                        </span>
+
+                        <div>
+                            <label for="schoolInput" class="block text-xs font-semibold text-slate-700 mb-1">Tên trường / Đơn vị</label>
+                            <input type="text" id="schoolInput" value="TRƯỜNG THPT HỒNG NGỰ 3 - TỔ TOÁN"
+                                class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-800 focus:border-[#1e3a8a] focus:outline-none">
+                        </div>
+
+                        <div>
+                            <label for="examTitleInput" class="block text-xs font-semibold text-slate-700 mb-1">Tiêu đề kỳ thi</label>
+                            <input type="text" id="examTitleInput" value="KIỂM TRA ĐÁNH GIÁ ĐỊNH KỲ"
+                                class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-800 focus:border-[#1e3a8a] focus:outline-none">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2.5">
+                            <div>
+                                <label for="subjectInput" class="block text-xs font-semibold text-slate-700 mb-1">Môn thi</label>
+                                <input type="text" id="subjectInput" value="TOÁN HỌC"
+                                    class="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800 focus:border-[#1e3a8a] focus:outline-none">
+                            </div>
+                            <div>
+                                <label for="durationInput" class="block text-xs font-semibold text-slate-700 mb-1">Thời gian</label>
+                                <input type="text" id="durationInput" value="45 phút"
+                                    class="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-800 focus:border-[#1e3a8a] focus:outline-none">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ghi chú đồng bộ -->
+                    <div class="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-900 flex items-start gap-2.5">
+                        <i data-lucide="refresh-cw" class="w-4 h-4 text-[#1e3a8a] shrink-0 mt-0.5"></i>
+                        <p class="leading-relaxed">
+                            Mọi thay đổi về số câu và cấu trúc ở đây sẽ <strong>tự động đồng bộ 100%</strong> với hệ thống nhận diện tọa độ tại <strong>Tab 2 (Chấm Bài)</strong>.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Nút hành động xuất bản dưới đáy -->
+                <div class="p-4 bg-slate-50 border-t border-slate-200 space-y-2 shrink-0">
+                    <button type="button" onclick="printOmrSheet()"
+                        class="w-full py-3 px-4 bg-[#1e3a8a] hover:bg-blue-900 active:bg-blue-950 text-white font-bold text-sm rounded-xl shadow-sm flex items-center justify-center gap-2 transition cursor-pointer">
+                        <i data-lucide="printer" class="w-5 h-5"></i>
+                        <span id="btnPrintText">In Phiếu / Lưu PDF (Chuẩn 1:1)</span>
+                    </button>
+                    <div class="grid grid-cols-1 gap-2" id="downloadPngButtonsGrid">
+                        <button type="button" onclick="downloadSingleBlankPng()"
+                            class="w-full py-2 px-3 bg-white hover:bg-slate-100 text-slate-800 font-semibold text-xs rounded-xl border border-slate-300 flex items-center justify-center gap-1.5 transition cursor-pointer">
+                            <i data-lucide="file-image" class="w-4 h-4 text-[#059669] shrink-0"></i>
+                            <span id="btnDownloadSingleText">Tải ảnh phiếu đơn (.PNG)</span>
+                        </button>
+                        <button id="btnDownload2UpPng" type="button" onclick="download2UpBlankPng()"
+                            class="hidden w-full py-2 px-3 bg-emerald-50 hover:bg-emerald-100 text-[#059669] font-bold text-xs rounded-xl border border-emerald-300 flex items-center justify-center gap-1.5 transition cursor-pointer">
+                            <i data-lucide="columns-2" class="w-4 h-4 shrink-0"></i>
+                            <span>Tải tờ A4 ghép đôi (.PNG)</span>
+                        </button>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- CỘT PHẢI (65%): KHUNG XEM TRƯỚC PHIẾU OMR -->
+            <main class="w-full lg:w-[65%] xl:w-[67%] bg-slate-200/80 overflow-y-auto custom-scrollbar p-4 sm:p-6 flex flex-col items-center">
+                <div class="w-full max-w-[920px] flex items-center justify-between mb-3 px-1">
+                    <div class="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                        <span class="w-2.5 h-2.5 rounded-full bg-[#059669]"></span>
+                        <span id="previewMetaText">Bản vẽ vector độ phân giải cao • Khổ A4 (210 × 297 mm)</span>
+                    </div>
+                    <button type="button" onclick="switchTab(2)"
+                        class="text-xs font-bold text-[#1e3a8a] hover:underline flex items-center gap-1 cursor-pointer">
+                        <span>Chuyển sang Chấm bài ngay</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+
+                <!-- Canvas hiển thị tờ phiếu OMR -->
+                <div id="previewCanvasWrapper" class="w-full max-w-[780px] pb-8 transition-all duration-200">
+                    <canvas id="sheetPreviewCanvas"></canvas>
+                </div>
+            </main>
+        </section>
+
+        <!-- =====================================================================
+             TAB 2: CHẤM BÀI & XUẤT ĐIỂM (ĐỒNG BỘ TỌA ĐỘ TỰ ĐỘNG)
+             ===================================================================== -->
+        <section id="tabContent2" class="hidden flex-1 flex-col lg:flex-row lg:overflow-hidden">
+            
+            <!-- CỘT TRÁI (35%): CẤU HÌNH ĐÁP ÁN, MÃ ĐỀ & THANG ĐIỂM -->
+            <aside class="w-full lg:w-[35%] xl:w-[33%] bg-white border-b lg:border-b-0 lg:border-r border-slate-200 flex flex-col lg:h-full">
+                <div class="p-4 sm:p-5 overflow-y-auto custom-scrollbar flex-1 space-y-5">
+                    
+                    <!-- Tóm tắt cấu trúc đang đồng bộ -->
+                    <div class="p-3 rounded-xl bg-slate-900 text-white flex items-center justify-between">
+                        <div>
+                            <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Cấu trúc đang áp dụng</div>
+                            <div id="syncSummaryText" class="text-xs sm:text-sm font-bold text-emerald-300 mt-0.5">
+                                40 câu ABCD • Khổ A4
+                            </div>
+                        </div>
+                        <button type="button" onclick="switchTab(1)"
+                            class="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold transition cursor-pointer">
+                            Đổi cấu trúc
+                        </button>
+                    </div>
+
+                    <!-- 1. Quản lý Mã đề -->
+                    <div class="space-y-2.5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-extrabold uppercase tracking-wider text-[#1e3a8a] flex items-center gap-1.5">
+                                <i data-lucide="key-round" class="w-4 h-4"></i> Quản lý Mã đề &amp; Đáp án
+                            </span>
+                            <button type="button" onclick="generateRandomAnswerKey()"
+                                class="text-[11px] font-bold text-[#059669] hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 transition cursor-pointer">
+                                + Tạo đáp án mẫu ngẫu nhiên
+                            </button>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <select id="examCodeSelect" onchange="onSelectExamCode()"
+                                class="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-[#1e3a8a] focus:border-[#1e3a8a] focus:outline-none">
+                            </select>
+                            <button type="button" onclick="addNewExamCode()"
+                                class="px-3 py-2 rounded-lg bg-[#1e3a8a] hover:bg-blue-900 text-white text-xs font-bold shrink-0 cursor-pointer">
+                                + Mã đề
+                            </button>
+                            <button type="button" onclick="deleteCurrentExamCode()" title="Xóa mã đề này"
+                                class="p-2 rounded-lg border border-slate-300 hover:bg-red-50 hover:text-[#dc2626] hover:border-red-200 text-slate-500 transition cursor-pointer">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 2. Nhập đáp án Phần I (ABCD) -->
+                    <div id="keyEditorPart1" class="space-y-2.5">
+                        <div class="flex items-center justify-between">
+                            <label for="quickKeyStringInput" class="text-xs font-bold text-slate-700">
+                                Phần I: Nhập chuỗi đáp án nhanh (A, B, C, D)
+                            </label>
+                            <span id="part1KeyProgress" class="text-[11px] font-mono-code font-bold text-slate-500">0/40</span>
+                        </div>
+                        <input type="text" id="quickKeyStringInput" placeholder="Ví dụ: ABCDABCD..."
+                            class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono-code uppercase tracking-widest text-slate-900 focus:border-[#1e3a8a] focus:outline-none">
+                        
+                        <!-- Lưới bấm chọn đáp án từng câu -->
+                        <div id="part1GridContainer" class="max-h-52 overflow-y-auto custom-scrollbar border border-slate-200 rounded-xl p-2 bg-slate-50 grid grid-cols-2 gap-1.5">
+                        </div>
+                    </div>
+
+                    <!-- 3. Nhập đáp án Phần II (Đúng / Sai) -->
+                    <div id="keyEditorPart2" class="hidden space-y-2.5">
+                        <div class="text-xs font-bold text-slate-700">
+                            Phần II: Đáp án Đúng / Sai (Lũy tiến 0.1 - 0.25 - 0.5 - 1.0đ)
+                        </div>
+                        <div id="part2GridContainer" class="space-y-2 border border-slate-200 rounded-xl p-2.5 bg-slate-50">
+                        </div>
+                    </div>
+
+                    <!-- 4. Nhập đáp án Phần III (Trả lời ngắn) -->
+                    <div id="keyEditorPart3" class="hidden space-y-2.5">
+                        <div class="text-xs font-bold text-slate-700">
+                            Phần III: Đáp án Trả lời ngắn (Tối đa 4 ký tự: số, dấu -, dấu ,)
+                        </div>
+                        <div id="part3GridContainer" class="grid grid-cols-2 gap-2 border border-slate-200 rounded-xl p-2.5 bg-slate-50">
+                        </div>
+                    </div>
+
+                    <hr class="border-slate-200">
+
+                    <!-- 5. CẤU HÌNH THANG ĐIỂM TÙY CHỈNH -->
+                    <div class="space-y-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-extrabold uppercase tracking-wider text-[#1e3a8a] flex items-center gap-1.5">
+                                <i data-lucide="calculator" class="w-4 h-4"></i> Cấu hình Thang điểm
+                            </span>
+                            <button type="button" onclick="autoDistributePoints10()"
+                                class="text-[11px] font-bold text-[#1e3a8a] hover:bg-blue-100 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 transition cursor-pointer">
+                                Tự chia đều 10đ
+                            </button>
+                        </div>
+
+                        <!-- Chọn nhanh chế độ thang điểm -->
+                        <div>
+                            <label for="scorePresetSelect" class="block text-[11px] font-semibold text-slate-600 mb-1">Chế độ tính điểm nhanh</label>
+                            <select id="scorePresetSelect" onchange="applyScorePreset()"
+                                class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-800 focus:border-[#1e3a8a] focus:outline-none">
+                                <option value="standard" selected>Chuẩn từng phần (0.25đ / 1.0đ / 0.5đ)</option>
+                                <option value="even10">Tự chia đều Thang điểm 10 cho tổng số câu</option>
+                                <option value="even100">Tự chia đều Thang điểm 100 cho tổng số câu</option>
+                                <option value="custom">Tùy chỉnh điểm số từng phần bên dưới</option>
+                            </select>
+                        </div>
+
+                        <!-- Nhập điểm chi tiết từng phần -->
+                        <div class="grid grid-cols-3 gap-2">
+                            <div class="bg-white p-2 rounded-lg border border-slate-200">
+                                <label for="ptsPart1Input" class="block text-[10px] font-bold text-slate-600 mb-1">Điểm/câu P.I</label>
+                                <input type="number" id="ptsPart1Input" step="0.05" min="0" value="0.25"
+                                    class="w-full rounded border border-slate-300 px-1.5 py-1 text-xs font-mono-code font-bold text-center text-[#1e3a8a] focus:border-[#1e3a8a] focus:outline-none">
+                            </div>
+                            <div class="bg-white p-2 rounded-lg border border-slate-200">
+                                <label for="ptsPart2Input" class="block text-[10px] font-bold text-slate-600 mb-1">Điểm/câu P.II</label>
+                                <input type="number" id="ptsPart2Input" step="0.05" min="0" value="1.0"
+                                    class="w-full rounded border border-slate-300 px-1.5 py-1 text-xs font-mono-code font-bold text-center text-[#059669] focus:border-[#1e3a8a] focus:outline-none">
+                            </div>
+                            <div class="bg-white p-2 rounded-lg border border-slate-200">
+                                <label for="ptsPart3Input" class="block text-[10px] font-bold text-slate-600 mb-1">Điểm/câu P.III</label>
+                                <input type="number" id="ptsPart3Input" step="0.05" min="0" value="0.5"
+                                    class="w-full rounded border border-slate-300 px-1.5 py-1 text-xs font-mono-code font-bold text-center text-amber-700 focus:border-[#1e3a8a] focus:outline-none">
+                            </div>
+                        </div>
+
+                        <!-- Cách tính điểm Phần II (Đúng/Sai) -->
+                        <div>
+                            <label for="part2ModeSelect" class="block text-[11px] font-semibold text-slate-600 mb-1">Cách tính điểm Phần II (Đúng/Sai 4 ý)</label>
+                            <select id="part2ModeSelect"
+                                class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 focus:border-[#1e3a8a] focus:outline-none">
+                                <option value="progressive" selected>Lũy tiến chuẩn BGD (10% - 25% - 50% - 100%)</option>
+                                <option value="equal">Chia đều từng ý đúng (Mỗi ý = 25% điểm câu)</option>
+                            </select>
+                        </div>
+
+                        <!-- Tổng điểm dự kiến & Cảnh báo nếu khác 10.0đ -->
+                        <div id="configuredTotalBox" class="p-2.5 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-between">
+                            <span class="text-xs font-bold text-[#1e3a8a]">Tổng điểm cấu hình:</span>
+                            <span id="configuredTotalScoreLabel" class="text-sm font-mono-code font-extrabold text-[#1e3a8a]">10.00 điểm</span>
+                        </div>
+                        <div id="scoreWarningBanner" class="hidden p-2 rounded-lg bg-amber-50 border border-amber-300 text-[11px] font-medium text-amber-800 flex items-center gap-1.5">
+                            <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600 shrink-0"></i>
+                            <span id="scoreWarningText">Lưu ý: Tổng điểm cấu hình hiện khác 10.00 điểm.</span>
+                        </div>
+
+                        <button type="button" onclick="recalculateAllExistingResults()"
+                            class="w-full py-2 px-3 rounded-xl bg-white hover:bg-blue-50 text-[#1e3a8a] border border-blue-300 text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer">
+                            <i data-lucide="refresh-ccw" class="w-3.5 h-3.5"></i>
+                            <span>Tính lại điểm theo thang mới</span>
+                        </button>
+                    </div>
+
+                    <!-- 6. Độ nhạy OMR & Gemini AI -->
+                    <div class="space-y-2.5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-extrabold uppercase tracking-wider text-[#1e3a8a] flex items-center gap-1.5">
+                                <i data-lucide="gauge" class="w-4 h-4"></i> Độ nhạy OMR &amp; Gemini AI
+                            </span>
+                            <div class="flex items-center gap-3">
+                                <label class="inline-flex items-center gap-1 cursor-pointer select-none" title="Sử dụng Gemini Vision API đọc chữ viết tay Mã đề">
+                                    <input type="checkbox" id="geminiOcrToggle" checked class="w-3.5 h-3.5 rounded text-[#1e3a8a]">
+                                    <span class="text-[11px] font-bold text-[#1e3a8a]">Gemini AI OCR</span>
+                                </label>
+                                <label class="inline-flex items-center gap-1 cursor-pointer select-none">
+                                    <input type="checkbox" id="soundToggle" checked class="w-3.5 h-3.5 rounded text-[#1e3a8a]">
+                                    <span class="text-[11px] font-semibold text-slate-700">Tiếng "Tít"</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Ô nhập Gemini API Key để chạy độc lập ở mọi nền tảng -->
+                        <div id="geminiApiKeyBox" class="p-2.5 rounded-xl bg-blue-50/80 border border-blue-200 space-y-1.5">
+                            <div class="flex items-center justify-between">
+                                <label for="geminiApiKeyInput" class="text-[11px] font-bold text-[#1e3a8a] flex items-center gap-1">
+                                    <i data-lucide="key" class="w-3 h-3"></i> Gemini API Key (Tùy chọn)
+                                </label>
+                                <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer"
+                                    class="text-[10px] font-bold text-blue-700 underline hover:text-blue-900">
+                                    Lấy Key miễn phí ↗
+                                </a>
+                            </div>
+                            <input type="password" id="geminiApiKeyInput" placeholder="Dán AIzaSy... (Để trống nếu dùng Offline)"
+                                class="w-full rounded-lg border border-blue-300 bg-white px-2.5 py-1.5 text-xs font-mono-code text-slate-800 focus:border-[#1e3a8a] focus:outline-none">
+                        </div>
+
+                        <div>
+                            <div class="flex items-center justify-between text-xs font-semibold text-slate-700 mb-1">
+                                <label for="thresholdSlider">Ngưỡng đậm tô chì</label>
+                                <span id="thresholdLabel" class="font-mono-code font-bold text-[#1e3a8a]">45%</span>
+                            </div>
+                            <input type="range" id="thresholdSlider" min="20" max="80" value="45"
+                                class="w-full accent-[#1e3a8a] cursor-pointer">
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- CỘT PHẢI (65%): CAMERA / ẢNH CHỤP & BẢNG ĐIỂM -->
+            <main class="w-full lg:w-[65%] xl:w-[67%] bg-slate-100 overflow-y-auto custom-scrollbar p-4 sm:p-6 space-y-5">
+                
+                <!-- Thanh công cụ nguồn ảnh chấm bài -->
+                <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-2.5">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button id="btnToggleCamera" type="button" onclick="toggleCamera()"
+                            class="px-4 py-2.5 rounded-xl bg-[#1e3a8a] hover:bg-blue-900 text-white text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer shadow-sm">
+                            <i data-lucide="video" class="w-4 h-4"></i>
+                            <span id="btnCameraText">Bật Camera trực tiếp</span>
+                        </button>
+
+                        <label class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer shadow-sm">
+                            <i data-lucide="upload" class="w-4 h-4"></i>
+                            <span>Tải ảnh phiếu (1 hoặc nhiều ảnh)</span>
+                            <input type="file" id="imageUploadInput" accept="image/*" multiple class="hidden" onchange="handleBatchImageUpload(event)">
+                        </label>
+                    </div>
+
+                    <button type="button" onclick="runSimulatedSampleGrade()"
+                        class="px-4 py-2.5 rounded-xl bg-[#059669] hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer shadow-sm">
+                        <i data-lucide="sparkles" class="w-4 h-4"></i>
+                        <span>Chấm thử với ảnh phiếu mẫu tự tạo</span>
+                    </button>
+                </div>
+
+                <!-- Khung Camera trực tiếp (Ẩn mặc định cho tới khi bấm Bật Camera) -->
+                <div id="cameraPanel" class="hidden bg-slate-950 rounded-2xl overflow-hidden shadow-lg border-2 border-[#1e3a8a] relative">
+                    <div class="relative w-full max-h-[520px] flex items-center justify-center bg-black overflow-hidden">
+                        <video id="cameraVideo" autoplay playsinline muted class="w-full max-h-[520px] object-contain"></video>
+                        
+                        <!-- Lớp phủ khung ngắm 4 điểm neo màu xanh lá -->
+                        <div class="absolute inset-0 pointer-events-none flex items-center justify-center p-6">
+                            <div class="relative w-[72%] max-w-[360px] aspect-[1/1.414] border-2 border-dashed border-emerald-400/80 rounded-lg">
+                                <!-- 4 góc định vị -->
+                                <div class="absolute -top-1.5 -left-1.5 w-7 h-7 border-t-4 border-l-4 border-emerald-400"></div>
+                                <div class="absolute -top-1.5 -right-1.5 w-7 h-7 border-t-4 border-r-4 border-emerald-400"></div>
+                                <div class="absolute -bottom-1.5 -left-1.5 w-7 h-7 border-b-4 border-l-4 border-emerald-400"></div>
+                                <div class="absolute -bottom-1.5 -right-1.5 w-7 h-7 border-b-4 border-r-4 border-emerald-400"></div>
+                                <div class="absolute top-2 inset-x-0 text-center">
+                                    <span class="px-2.5 py-1 rounded-full bg-black/70 text-emerald-300 text-[11px] font-semibold">
+                                        Căn 4 ô vuông đen của phiếu khớp vào 4 góc xanh
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Thanh điều khiển dưới Camera -->
+                    <div class="p-3 bg-slate-900 flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex items-center gap-3">
+                            <button type="button" onclick="switchCameraDevice()"
+                                class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer">
+                                <i data-lucide="switch-camera" class="w-4 h-4"></i>
+                                <span>Đổi Camera</span>
+                            </button>
+                            <label class="inline-flex items-center gap-2 text-xs text-slate-200 font-medium cursor-pointer">
+                                <input type="checkbox" id="autoCaptureCheck" class="w-4 h-4 rounded text-emerald-500">
+                                <span>Tự động chụp mỗi 2.5 giây</span>
+                            </label>
+                        </div>
+
+                        <button type="button" onclick="captureAndGradeFromCamera()"
+                            class="px-5 py-2.5 rounded-xl bg-[#059669] hover:bg-emerald-600 text-white text-sm font-extrabold flex items-center gap-2 shadow-md cursor-pointer">
+                            <i data-lucide="aperture" class="w-5 h-5"></i>
+                            <span>CHỤP &amp; CHẤM NGAY</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Khu vực hiển thị kết quả bài vừa chấm trực quan -->
+                <div class="grid grid-cols-1 xl:grid-cols-12 gap-4">
+                    <!-- Ảnh phiếu đã vẽ vòng tròn Đúng/Sai -->
+                    <div class="xl:col-span-7 bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
+                        <div class="flex items-center justify-between mb-2.5">
+                            <span class="text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                                <i data-lucide="scan-eye" class="w-4 h-4 text-[#1e3a8a]"></i> Ảnh phiếu đã nhận diện &amp; chấm
+                            </span>
+                            <div class="flex items-center gap-3 text-[11px] font-semibold">
+                                <span class="flex items-center gap-1 text-[#059669]"><span class="w-2.5 h-2.5 rounded-full bg-[#059669]"></span> Đúng</span>
+                                <span class="flex items-center gap-1 text-[#dc2626]"><span class="w-2.5 h-2.5 rounded-full bg-[#dc2626]"></span> Tô sai</span>
+                                <span class="flex items-center gap-1 text-blue-600"><span class="w-2.5 h-2.5 rounded-full border-2 border-blue-600"></span> Đáp án đúng</span>
+                            </div>
+                        </div>
+
+                        <div class="flex-1 bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center min-h-[320px] p-2 overflow-hidden">
+                            <canvas id="gradedResultCanvas" class="max-w-full max-h-[460px] rounded shadow-sm bg-white"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Thẻ tổng hợp điểm số bài vừa chấm -->
+                    <div class="xl:col-span-5 bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between space-y-4">
+                        <div>
+                            <div class="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-3">
+                                Kết quả bài vừa chấm
+                            </div>
+
+                            <!-- Điểm số lớn nổi bật -->
+                            <div class="p-4 rounded-2xl bg-gradient-to-br from-[#1e3a8a] to-blue-800 text-white text-center shadow-sm">
+                                <div class="text-xs uppercase tracking-widest text-blue-200 font-semibold">Tổng điểm đạt được</div>
+                                <div id="latestScoreDisplay" class="text-5xl font-extrabold my-1 tracking-tight">--</div>
+                                <div id="latestAccuracyDisplay" class="text-xs text-emerald-300 font-semibold">
+                                    Chưa có bài chấm nào
+                                </div>
+                            </div>
+
+                            <!-- Vùng hiển thị ảnh Crop ô Mã đề viết tay & Sửa nhanh 1 chạm -->
+                            <div class="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[11px] font-extrabold uppercase text-slate-600 flex items-center gap-1">
+                                        <i data-lucide="pen-line" class="w-3.5 h-3.5 text-[#1e3a8a]"></i> Mã đề viết tay (Bút mực)
+                                    </span>
+                                    <span id="ocrConfidenceBadge" class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">
+                                        Chờ quét
+                                    </span>
+                                </div>
+
+                                <div class="flex items-center gap-2.5">
+                                    <!-- Ảnh cắt cận cảnh vùng ô viết tay Mã đề -->
+                                    <div class="h-12 w-28 rounded-lg border border-slate-300 bg-white flex items-center justify-center overflow-hidden shrink-0">
+                                        <canvas id="croppedCodeCanvas" width="140" height="56" class="max-w-full max-h-full object-contain"></canvas>
+                                    </div>
+
+                                    <!-- Ô nhập sửa nhanh Mã đề & Tính lại ngay -->
+                                    <div class="flex-1 flex items-center gap-1.5">
+                                        <input type="text" id="latestCodeQuickInput" maxlength="4" placeholder="Mã đề"
+                                            class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-base font-mono-code font-extrabold text-center text-[#1e3a8a] focus:border-[#1e3a8a] focus:outline-none">
+                                        <button type="button" onclick="applyManualCodeOverride()" title="Cập nhật mã đề & chấm lại bài này"
+                                            class="px-3 py-2 rounded-lg bg-[#059669] hover:bg-emerald-700 text-white text-xs font-bold shrink-0 cursor-pointer">
+                                            Áp dụng
+                                        </button>
+                                    </div>
+                                </div>
+                                <p class="text-[10px] text-slate-500">
+                                    * Nếu chữ học sinh viết khó đọc, gõ lại Mã đề vào ô trên và bấm <strong>Áp dụng</strong> để tính lại điểm tức thì.
+                                </p>
+                            </div>
+
+                            <!-- Chi tiết từng phần -->
+                            <div id="latestBreakdownBox" class="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1.5 text-slate-700">
+                                <div class="font-bold text-slate-800">Chi tiết nhận diện:</div>
+                                <p class="text-slate-500 italic">Bấm "Chấm thử với ảnh phiếu mẫu tự tạo" hoặc đưa phiếu vào Camera để xem phân tích chi tiết từng câu.</p>
+                            </div>
+                        </div>
+
+                        <div class="pt-2 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between">
+                            <span>Gemini Vision OCR + Bilinear OMR</span>
+                            <span id="latestProcessTime">0 ms</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bảng danh sách điểm đã chấm -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex items-center gap-2">
+                            <h2 class="font-extrabold text-sm text-slate-800 uppercase tracking-wide">
+                                Bảng Điểm Đã Chấm
+                            </h2>
+                            <span id="gradedCountBadge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-[#1e3a8a]">
+                                0 bài
+                            </span>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="exportResultsToExcel()"
+                                class="px-3.5 py-2 rounded-xl bg-[#059669] hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-sm">
+                                <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                                <span>Xuất Excel (.csv / .xls)</span>
+                            </button>
+                            <button type="button" onclick="clearAllResults()"
+                                class="px-3 py-2 rounded-xl bg-white hover:bg-red-50 text-[#dc2626] border border-red-200 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                <span>Xóa danh sách</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500">
+                                    <th class="py-3 px-4 w-12">STT</th>
+                                    <th class="py-3 px-4">Mã bài / Tên thí sinh (Sửa nhanh)</th>
+                                    <th class="py-3 px-4">Mã đề</th>
+                                    <th class="py-3 px-4">Số câu đúng</th>
+                                    <th class="py-3 px-4">Chi tiết sai / Tô đúp</th>
+                                    <th class="py-3 px-4 text-right">Điểm số</th>
+                                    <th class="py-3 px-4 text-center">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resultsTableBody" class="divide-y divide-slate-100 text-xs sm:text-sm">
+                                <tr>
+                                    <td colspan="7" class="py-8 text-center text-slate-400 italic">
+                                        Chưa có dữ liệu bài chấm. Hãy chấm thử hoặc tải ảnh phiếu bài làm lên.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </main>
+        </section>
+    </div>
+
+    <!-- MODAL XEM LẠI ẢNH BÀI CHẤM TRONG BẢNG -->
+    <div id="reviewModal" class="hidden fixed inset-0 bg-slate-950/75 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+            <div class="px-5 py-3.5 bg-[#1e3a8a] text-white flex items-center justify-between">
+                <h3 id="reviewModalTitle" class="font-bold text-sm">Chi tiết bài làm</h3>
+                <button type="button" onclick="closeReviewModal()" class="p-1 hover:bg-white/20 rounded-lg cursor-pointer">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="p-4 overflow-y-auto flex-1 bg-slate-100 flex items-center justify-center">
+                <img id="reviewModalImg" src="" alt="Ảnh bài đã chấm" class="max-w-full max-h-[72vh] rounded-lg shadow">
+            </div>
+        </div>
+    </div>
+
+    <!-- THÔNG BÁO TOAST -->
+    <div id="toastBox" class="fixed bottom-5 right-5 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl text-xs sm:text-sm font-semibold flex items-center gap-2.5 opacity-0 pointer-events-none transition-opacity duration-300 z-50 border border-slate-700">
+        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+        <span id="toastMsg">Thông báo</span>
+    </div>
+
+    <script>
+        // =========================================================================
+        // 1. KHỞI TẠO TRẠNG THÁI HỆ THỐNG & LƯU TRỮ LOCALSTORAGE
+        // =========================================================================
+        const STORAGE_KEY = 'PHAMHAU_EDU_OMR_SYSTEM_V2';
+
+        const defaultState = {
+            config: {
+                preset: '40abcd',
+                part1Count: 40,
+                part2Count: 0,
+                part3Count: 0,
+                paperMode: 'AUTO', // 'AUTO' | 'A5' | 'A4'
+                paperSize: 'A4',   // Khổ thực tế của 1 phiếu đơn: 'A5' | 'A4'
+                twoUpA4: true,     // Xếp 2 phiếu A5 trên 1 tờ A4 ngang khi in
+                codeDigits: 3,
+                schoolName: 'TRƯỜNG THPT HỒNG NGỰ 3 - TỔ TOÁN',
+                examTitle: 'KIỂM TRA ĐÁNH GIÁ ĐỊNH KỲ',
+                subjectName: 'TOÁN HỌC',
+                duration: '45 phút'
+            },
+            grading: {
+                selectedCode: '101',
+                answerKeys: {
+                    '101': {
+                        part1: {},
+                        part2: {},
+                        part3: {}
+                    }
+                },
+                scorePreset: 'standard', // 'standard' | 'even10' | 'even100' | 'custom'
+                ptsPart1: 0.25,
+                ptsPart2: 1.0,
+                ptsPart3: 0.5,
+                part2Mode: 'progressive', // 'progressive' | 'equal'
+                threshold: 45,
+                soundEnabled: true,
+                geminiOcrEnabled: true,
+                geminiApiKey: ''
+            },
+            results: []
+        };
+
+        let appState = loadAppState();
+        let activeSheetGeometry = null; // Lưu tọa độ chuẩn hóa [0..1] của mọi vòng tròn & ô viết Mã đề
+        let lastGradedContext = null;   // Lưu thông tin bài vừa chấm gần nhất để có thể sửa nhanh Mã đề & tính lại
+        let cameraStream = null;
+        let currentFacingMode = 'environment';
+        let autoCaptureTimer = null;
+
+        function loadAppState() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) return structuredClone(defaultState);
+                const parsed = JSON.parse(raw);
+                return {
+                    config: { ...defaultState.config, ...(parsed.config || {}) },
+                    grading: {
+                        ...defaultState.grading,
+                        ...(parsed.grading || {}),
+                        answerKeys: (parsed.grading && parsed.grading.answerKeys && Object.keys(parsed.grading.answerKeys).length > 0)
+                            ? parsed.grading.answerKeys
+                            : structuredClone(defaultState.grading.answerKeys)
+                    },
+                    results: Array.isArray(parsed.results) ? parsed.results : []
+                };
+            } catch (e) {
+                return structuredClone(defaultState);
+            }
+        }
+
+        function saveAppState() {
+            try {
+                const stateToSave = {
+                    config: appState.config,
+                    grading: appState.grading,
+                    results: appState.results.map(r => ({ ...r, previewDataUrl: null }))
+                };
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+            } catch (e) {
+                // Bỏ qua nếu đầy bộ nhớ trình duyệt
+            }
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toastBox');
+            document.getElementById('toastMsg').textContent = msg;
+            toast.classList.remove('opacity-0');
+            setTimeout(() => toast.classList.add('opacity-0'), 2800);
+        }
+
+        // =========================================================================
+        // 2. BỘ MÁY DỰNG HÌNH HỌC & TỌA ĐỘ CHUẨN HÓA PHIẾU OMR (ĐỒNG BỘ 100%)
+        // =========================================================================
+        function resolveEffectivePaperSize(cfg) {
+            const mode = cfg.paperMode || 'AUTO';
+            if (mode === 'A5' || mode === 'A4') return mode;
+            const totalUnits = (cfg.part1Count || 0) + (cfg.part2Count || 0) * 4 + (cfg.part3Count || 0) * 4;
+            return totalUnits <= 32 ? 'A5' : 'A4';
+        }
+
+        function buildSheetGeometry(cfg) {
+            const effectivePaper = resolveEffectivePaperSize(cfg);
+            cfg.paperSize = effectivePaper;
+            const isA5 = effectivePaper === 'A5';
+            const W = isA5 ? 1480 : 2100;
+            const H = isA5 ? 2100 : 2970;
+
+            const margin = isA5 ? 55 : 75;
+            const markerSize = isA5 ? 58 : 72;
+
+            // Vùng làm việc chuẩn hóa bên trong tâm của 4 điểm định vị góc
+            const scanLeft = margin + markerSize / 2;
+            const scanTop = margin + markerSize / 2;
+            const scanRight = W - margin - markerSize / 2;
+            const scanBottom = H - margin - markerSize / 2;
+            const scanW = scanRight - scanLeft;
+            const scanH = scanBottom - scanTop;
+
+            const normX = (px) => (px - scanLeft) / scanW;
+            const normY = (py) => (py - scanTop) / scanH;
+            const normR = (rPx) => rPx / scanW;
+
+            const geo = {
+                W, H, isA5,
+                scanLeft, scanTop, scanRight, scanBottom, scanW, scanH,
+                markerSize, margin,
+                codeDigits: cfg.codeDigits || 3,
+                codeBoxes: [],
+                codeCropBox: null,
+                part1Bubbles: [],
+                part2Bubbles: [],
+                part3Bubbles: [],
+                metaDrawings: []
+            };
+
+            const innerPadX = isA5 ? 52 : 72;
+            const innerPadY = isA5 ? 52 : 68;
+            const contentLeft = scanLeft + innerPadX;
+            const contentRight = scanRight - innerPadX;
+            const contentW = contentRight - contentLeft;
+            let curY = scanTop + innerPadY;
+
+            // --- PHẦN ĐẦU PHIẾU: TIÊU ĐỀ BÊN TRÁI + KHUNG VIẾT MÃ ĐỀ BÊN PHẢI ---
+            const codeBoxCount = cfg.codeDigits || 3;
+            const cellW = isA5 ? 46 : 60;
+            const cellH = isA5 ? 58 : 74;
+            const cellGap = isA5 ? 8 : 12;
+            const codeBlockW = codeBoxCount * cellW + (codeBoxCount - 1) * cellGap + (isA5 ? 28 : 38);
+            const codeBlockH = isA5 ? 112 : 142;
+
+            const headerLeftW = contentW - codeBlockW - (isA5 ? 18 : 26);
+
+            // Tiêu đề trường & kỳ thi
+            geo.metaDrawings.push({
+                type: 'header',
+                x: contentLeft,
+                y: curY,
+                w: headerLeftW,
+                h: codeBlockH,
+                school: cfg.schoolName,
+                title: cfg.examTitle,
+                subject: cfg.subjectName,
+                duration: cfg.duration
+            });
+
+            // Khung viết tay Mã đề ở góc phải
+            const codeBlockX = contentRight - codeBlockW;
+            const codeBlockY = curY;
+            const cellsStartX = codeBlockX + (codeBlockW - (codeBoxCount * cellW + (codeBoxCount - 1) * cellGap)) / 2;
+            const cellsStartY = codeBlockY + (isA5 ? 36 : 46);
+
+            const codeBoxCoords = [];
+            for (let d = 0; d < codeBoxCount; d++) {
+                const bx = cellsStartX + d * (cellW + cellGap);
+                const by = cellsStartY;
+                codeBoxCoords.push({ x: bx, y: by, w: cellW, h: cellH });
+                geo.codeBoxes.push({
+                    digitIndex: d,
+                    nx: normX(bx),
+                    ny: normY(by),
+                    nw: cellW / scanW,
+                    nh: cellH / scanH
+                });
+            }
+
+            geo.codeCropBox = {
+                nx: normX(cellsStartX - 10),
+                ny: normY(cellsStartY - 8),
+                nw: (codeBoxCount * cellW + (codeBoxCount - 1) * cellGap + 20) / scanW,
+                nh: (cellH + 16) / scanH
+            };
+
+            geo.metaDrawings.push({
+                type: 'codeHandwritingBox',
+                x: codeBlockX,
+                y: codeBlockY,
+                w: codeBlockW,
+                h: codeBlockH,
+                cells: codeBoxCoords
+            });
+
+            curY += codeBlockH + (isA5 ? 14 : 20);
+
+            // Dòng kẻ thông tin thí sinh gọn gàng (Bỏ hoàn toàn lưới tô SBD)
+            const studentInfoH = isA5 ? 58 : 74;
+            geo.metaDrawings.push({
+                type: 'studentInfoLines',
+                x: contentLeft,
+                y: curY,
+                w: contentW,
+                h: studentInfoH
+            });
+
+            curY += studentInfoH + (isA5 ? 16 : 22);
+
+            // Tính toán chiều cao còn lại cho các phần câu hỏi
+            const bottomLimit = scanBottom - innerPadY;
+            const availH = bottomLimit - curY;
+
+            const hasP1 = cfg.part1Count > 0;
+            const hasP2 = cfg.part2Count > 0;
+            const hasP3 = cfg.part3Count > 0;
+
+            let weightP1 = hasP1 ? Math.max(1.2, Math.ceil(cfg.part1Count / 10) * 0.85) : 0;
+            let weightP2 = hasP2 ? 1.05 : 0;
+            let weightP3 = hasP3 ? 1.55 : 0;
+            const totalWeight = (weightP1 + weightP2 + weightP3) || 1;
+            const sectionGap = isA5 ? 14 : 20;
+            const activeSections = (hasP1 ? 1 : 0) + (hasP2 ? 1 : 0) + (hasP3 ? 1 : 0);
+            const usableH = availH - Math.max(0, activeSections - 1) * sectionGap;
+
+            // --- PHẦN I: TRẮC NGHIỆM NHIỀU LỰA CHỌN (A, B, C, D) ---
+            if (hasP1) {
+                const p1H = usableH * (weightP1 / totalWeight);
+                const qCount = cfg.part1Count;
+                let cols = 4;
+                if (qCount <= 12) cols = 3;
+                else if (qCount <= 40) cols = 4;
+                else if (qCount <= 60) cols = 5;
+                else cols = 5;
+
+                const rowsPerCol = Math.ceil(qCount / cols);
+                const colGap = isA5 ? 14 : 22;
+                const colW = (contentW - (cols - 1) * colGap) / cols;
+                const headerOffset = isA5 ? 34 : 44;
+                const bodyH = p1H - headerOffset;
+                const rowStep = Math.min(isA5 ? 42 : 52, bodyH / Math.max(rowsPerCol, 1));
+                const bubbleR = Math.min(
+                    isA5 ? 13.5 : 17.5,
+                    (colW - (isA5 ? 42 : 56)) / 9.2,
+                    rowStep * 0.38
+                );
+
+                geo.metaDrawings.push({
+                    type: 'sectionBox',
+                    x: contentLeft,
+                    y: curY,
+                    w: contentW,
+                    h: p1H,
+                    title: `PHẦN I. TRẮC NGHIỆM NHIỀU PHƯƠNG ÁN LỰA CHỌN (${qCount} CÂU)`
+                });
+
+                const choices = ['A', 'B', 'C', 'D'];
+                for (let idx = 0; idx < qCount; idx++) {
+                    const colIdx = Math.floor(idx / rowsPerCol);
+                    const rowIdx = idx % rowsPerCol;
+                    const cxBase = contentLeft + colIdx * (colW + colGap);
+                    const cy = curY + headerOffset + rowIdx * rowStep + rowStep * 0.5;
+
+                    geo.metaDrawings.push({
+                        type: 'qLabel',
+                        x: cxBase + (isA5 ? 24 : 32),
+                        y: cy,
+                        text: String(idx + 1).padStart(2, '0')
+                    });
+
+                    const optStartX = cxBase + (isA5 ? 46 : 62);
+                    const optSpan = colW - (isA5 ? 54 : 74);
+                    const optStep = optSpan / 3;
+
+                    const qEntry = { qNum: idx + 1, options: [] };
+                    choices.forEach((ch, cIdx) => {
+                        const bx = optStartX + cIdx * optStep;
+                        qEntry.options.push({
+                            label: ch,
+                            nx: normX(bx),
+                            ny: normY(cy),
+                            nr: normR(bubbleR),
+                            px: bx,
+                            py: cy,
+                            pr: bubbleR
+                        });
+                    });
+                    geo.part1Bubbles.push(qEntry);
+                }
+
+                curY += p1H + sectionGap;
+            }
+
+            // --- PHẦN II: TRẮC NGHIỆM ĐÚNG / SAI ---
+            if (hasP2) {
+                const p2H = usableH * (weightP2 / totalWeight);
+                const qCount = cfg.part2Count;
+                const cols = Math.min(5, Math.max(2, qCount));
+                const rowsOfCards = Math.ceil(qCount / cols);
+                const cardGapX = isA5 ? 12 : 18;
+                const cardGapY = isA5 ? 10 : 14;
+                const headerOffset = isA5 ? 32 : 42;
+                const cardW = (contentW - (cols - 1) * cardGapX) / cols;
+                const cardH = (p2H - headerOffset - (rowsOfCards - 1) * cardGapY) / rowsOfCards;
+
+                geo.metaDrawings.push({
+                    type: 'sectionBox',
+                    x: contentLeft,
+                    y: curY,
+                    w: contentW,
+                    h: p2H,
+                    title: `PHẦN II. CÂU TRẮC NGHIỆM ĐÚNG / SAI (${qCount} CÂU)`
+                });
+
+                const subLabels = ['a', 'b', 'c', 'd'];
+                for (let idx = 0; idx < qCount; idx++) {
+                    const rCard = Math.floor(idx / cols);
+                    const cCard = idx % cols;
+                    const cardX = contentLeft + cCard * (cardW + cardGapX);
+                    const cardY = curY + headerOffset + rCard * (cardH + cardGapY);
+
+                    geo.metaDrawings.push({
+                        type: 'subCard',
+                        x: cardX,
+                        y: cardY,
+                        w: cardW,
+                        h: cardH,
+                        title: `Câu ${idx + 1}`
+                    });
+
+                    const subStartY = cardY + (isA5 ? 28 : 36);
+                    const subAvailH = cardH - (isA5 ? 32 : 42);
+                    const subStep = subAvailH / 4;
+                    const rBubble = Math.min(isA5 ? 11.5 : 14.5, subStep * 0.38, cardW * 0.13);
+
+                    const qObj = { qNum: idx + 1, subs: [] };
+                    subLabels.forEach((sub, sIdx) => {
+                        const sy = subStartY + sIdx * subStep + subStep * 0.5;
+                        const xTrue = cardX + cardW * 0.52;
+                        const xFalse = cardX + cardW * 0.80;
+
+                        geo.metaDrawings.push({
+                            type: 'subLabel',
+                            x: cardX + cardW * 0.22,
+                            y: sy,
+                            text: `${sub})`
+                        });
+
+                        qObj.subs.push({
+                            subLabel: sub,
+                            trueBubble: { label: 'Đ', nx: normX(xTrue), ny: normY(sy), nr: normR(rBubble), px: xTrue, py: sy, pr: rBubble },
+                            falseBubble: { label: 'S', nx: normX(xFalse), ny: normY(sy), nr: normR(rBubble), px: xFalse, py: sy, pr: rBubble }
+                        });
+                    });
+                    geo.part2Bubbles.push(qObj);
+                }
+
+                curY += p2H + sectionGap;
+            }
+
+            // --- PHẦN III: TRẮC NGHIỆM TRẢ LỜI NGẮN ---
+            if (hasP3) {
+                const p3H = usableH * (weightP3 / totalWeight);
+                const qCount = cfg.part3Count;
+                const cols = Math.min(6, Math.max(3, qCount));
+                const rowsOfCards = Math.ceil(qCount / cols);
+                const cardGapX = isA5 ? 10 : 14;
+                const cardGapY = isA5 ? 10 : 14;
+                const headerOffset = isA5 ? 32 : 42;
+                const cardW = (contentW - (cols - 1) * cardGapX) / cols;
+                const cardH = (p3H - headerOffset - (rowsOfCards - 1) * cardGapY) / rowsOfCards;
+
+                geo.metaDrawings.push({
+                    type: 'sectionBox',
+                    x: contentLeft,
+                    y: curY,
+                    w: contentW,
+                    h: p3H,
+                    title: `PHẦN III. CÂU TRẮC NGHIỆM TRẢ LỜI NGẮN (${qCount} CÂU)`
+                });
+
+                const symbols = ['-', ',', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+                for (let idx = 0; idx < qCount; idx++) {
+                    const rCard = Math.floor(idx / cols);
+                    const cCard = idx % cols;
+                    const cardX = contentLeft + cCard * (cardW + cardGapX);
+                    const cardY = curY + headerOffset + rCard * (cardH + cardGapY);
+
+                    geo.metaDrawings.push({
+                        type: 'subCard',
+                        x: cardX,
+                        y: cardY,
+                        w: cardW,
+                        h: cardH,
+                        title: `Câu ${idx + 1}`
+                    });
+
+                    const gridTop = cardY + (isA5 ? 28 : 36);
+                    const gridH = cardH - (isA5 ? 32 : 42);
+                    const rStep = gridH / symbols.length;
+                    const cSpan = cardW - (isA5 ? 16 : 24);
+                    const cStep = cSpan / 4;
+                    const cStart = cardX + (isA5 ? 8 : 12) + cStep * 0.5;
+                    const rBubble = Math.min(isA5 ? 8.5 : 11, rStep * 0.42, cStep * 0.40);
+
+                    const qObj = { qNum: idx + 1, cols: [[], [], [], []] };
+                    symbols.forEach((sym, rIdx) => {
+                        const by = gridTop + rIdx * rStep + rStep * 0.5;
+                        for (let c = 0; c < 4; c++) {
+                            if ((c === 0 && sym === ',') || (c > 0 && sym === '-')) continue;
+                            const bx = cStart + c * cStep;
+                            qObj.cols[c].push({
+                                label: sym,
+                                nx: normX(bx),
+                                ny: normY(by),
+                                nr: normR(rBubble),
+                                px: bx,
+                                py: by,
+                                pr: rBubble
+                            });
+                        }
+                    });
+                    geo.part3Bubbles.push(qObj);
+                }
+            }
+
+            return geo;
+        }
+
+        // Vẽ 1 tờ phiếu OMR hoàn chỉnh (A4 dọc hoặc A5 dọc) lên Canvas mục tiêu
+        function renderSingleOmrSheetToCanvas(targetCanvas, cfg, filledSample = null) {
+            const geo = buildSheetGeometry(cfg);
+            targetCanvas.width = geo.W;
+            targetCanvas.height = geo.H;
+            const ctx = targetCanvas.getContext('2d');
+
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, geo.W, geo.H);
+
+            // 1. Vẽ 4 ô vuông đen đặc định vị góc (Fiducial Markers)
+            const m = geo.margin;
+            const ms = geo.markerSize;
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(m, m, ms, ms);
+            ctx.fillRect(geo.W - m - ms, m, ms, ms);
+            ctx.fillRect(m, geo.H - m - ms, ms, ms);
+            ctx.fillRect(geo.W - m - ms, geo.H - m - ms, ms, ms);
+
+            // Khung bao vùng nhận diện nối tâm 4 điểm neo
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(geo.scanLeft, geo.scanTop, geo.scanW, geo.scanH);
+
+            // Timing marks 2 bên lề
+            ctx.fillStyle = '#0f172a';
+            const tickCount = geo.isA5 ? 20 : 28;
+            for (let t = 1; t < tickCount; t++) {
+                const ty = geo.scanTop + (geo.scanH * t) / tickCount;
+                ctx.fillRect(geo.scanLeft + 8, ty - 3, 14, 6);
+                ctx.fillRect(geo.scanRight - 22, ty - 3, 14, 6);
+            }
+
+            // 2. Vẽ các khung & nhãn cấu trúc
+            geo.metaDrawings.forEach(item => {
+                if (item.type === 'header') {
+                    ctx.strokeStyle = '#1e3a8a';
+                    ctx.lineWidth = 2.5;
+                    ctx.strokeRect(item.x, item.y, item.w, item.h);
+
+                    ctx.fillStyle = '#1e3a8a';
+                    ctx.textAlign = 'center';
+                    ctx.font = `700 ${geo.isA5 ? 19 : 25}px "Be Vietnam Pro", Arial`;
+                    ctx.fillText((item.school || '').toUpperCase(), item.x + item.w / 2, item.y + (geo.isA5 ? 28 : 36));
+
+                    ctx.fillStyle = '#0f172a';
+                    ctx.font = `800 ${geo.isA5 ? 24 : 33}px "Be Vietnam Pro", Arial`;
+                    ctx.fillText('PHIẾU TRẢ LỜI TRẮC NGHIỆM', item.x + item.w / 2, item.y + (geo.isA5 ? 60 : 78));
+
+                    ctx.fillStyle = '#334155';
+                    ctx.font = `600 ${geo.isA5 ? 17 : 22}px "Be Vietnam Pro", Arial`;
+                    const subLine = `${item.title} • MÔN: ${item.subject} (${item.duration})`;
+                    ctx.fillText(subLine, item.x + item.w / 2, item.y + (geo.isA5 ? 90 : 116));
+                }
+                else if (item.type === 'codeHandwritingBox') {
+                    ctx.fillStyle = '#f8fafc';
+                    ctx.fillRect(item.x, item.y, item.w, item.h);
+                    ctx.strokeStyle = '#1e3a8a';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(item.x, item.y, item.w, item.h);
+
+                    // 4 điểm neo góc cho khung Mã đề
+                    const mk = geo.isA5 ? 10 : 13;
+                    ctx.fillStyle = '#0f172a';
+                    ctx.fillRect(item.x, item.y, mk, mk);
+                    ctx.fillRect(item.x + item.w - mk, item.y, mk, mk);
+                    ctx.fillRect(item.x, item.y + item.h - mk, mk, mk);
+                    ctx.fillRect(item.x + item.w - mk, item.y + item.h - mk, mk, mk);
+
+                    ctx.fillStyle = '#1e3a8a';
+                    ctx.textAlign = 'center';
+                    ctx.font = `800 ${geo.isA5 ? 17 : 22}px "Be Vietnam Pro", Arial`;
+                    ctx.fillText('MÃ ĐỀ THI (VIẾT BÚT MỰC)', item.x + item.w / 2, item.y + (geo.isA5 ? 24 : 31));
+
+                    item.cells.forEach((cell, idx) => {
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(cell.x, cell.y, cell.w, cell.h);
+                        ctx.strokeStyle = '#0f172a';
+                        ctx.lineWidth = 2.5;
+                        ctx.strokeRect(cell.x, cell.y, cell.w, cell.h);
+
+                        if (filledSample && filledSample.examCode && filledSample.examCode[idx]) {
+                            ctx.save();
+                            ctx.fillStyle = '#1d4ed8';
+                            ctx.font = `700 ${Math.round(cell.h * 0.72)}px "Roboto Mono", monospace`;
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillText(filledSample.examCode[idx], cell.x + cell.w / 2, cell.y + cell.h / 2 + 2);
+                            ctx.restore();
+                        } else {
+                            ctx.fillStyle = '#e2e8f0';
+                            ctx.font = `700 ${Math.round(cell.h * 0.52)}px "Roboto Mono", monospace`;
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            const sampleChar = String((idx + 1) % 10);
+                            ctx.fillText(sampleChar, cell.x + cell.w / 2, cell.y + cell.h / 2 + 1);
+                        }
+                    });
+                }
+                else if (item.type === 'studentInfoLines') {
+                    ctx.strokeStyle = '#cbd5e1';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(item.x, item.y, item.w, item.h);
+
+                    ctx.fillStyle = '#0f172a';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
+                    ctx.font = `600 ${geo.isA5 ? 17 : 22}px "Be Vietnam Pro", Arial`;
+
+                    const row1Y = item.y + item.h * 0.30;
+                    const row2Y = item.y + item.h * 0.74;
+                    const pad = geo.isA5 ? 16 : 22;
+
+                    ctx.fillText('Họ và tên thí sinh:', item.x + pad, row1Y);
+                    ctx.fillText('Lớp:', item.x + item.w * 0.68, row1Y);
+
+                    ctx.fillText('Ngày kiểm tra:', item.x + pad, row2Y);
+                    ctx.fillText('Điểm số / Nhận xét:', item.x + item.w * 0.45, row2Y);
+
+                    ctx.save();
+                    ctx.setLineDash([4, 4]);
+                    ctx.strokeStyle = '#64748b';
+                    ctx.lineWidth = 1.5;
+
+                    ctx.beginPath();
+                    ctx.moveTo(item.x + pad + (geo.isA5 ? 155 : 200), row1Y + 6);
+                    ctx.lineTo(item.x + item.w * 0.66, row1Y + 6);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(item.x + item.w * 0.68 + (geo.isA5 ? 45 : 60), row1Y + 6);
+                    ctx.lineTo(item.x + item.w - pad, row1Y + 6);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(item.x + pad + (geo.isA5 ? 125 : 165), row2Y + 6);
+                    ctx.lineTo(item.x + item.w * 0.43, row2Y + 6);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(item.x + item.w * 0.45 + (geo.isA5 ? 165 : 215), row2Y + 6);
+                    ctx.lineTo(item.x + item.w - pad, row2Y + 6);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+                else if (item.type === 'sectionBox') {
+                    ctx.strokeStyle = '#1e3a8a';
+                    ctx.lineWidth = 2.5;
+                    ctx.strokeRect(item.x, item.y, item.w, item.h);
+
+                    ctx.fillStyle = '#eff6ff';
+                    ctx.fillRect(item.x + 1, item.y + 1, item.w - 2, geo.isA5 ? 28 : 36);
+
+                    ctx.fillStyle = '#1e3a8a';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
+                    ctx.font = `800 ${geo.isA5 ? 15 : 20}px "Be Vietnam Pro", Arial`;
+                    ctx.fillText(item.title, item.x + 14, item.y + (geo.isA5 ? 15 : 19));
+                }
+                else if (item.type === 'subCard') {
+                    ctx.strokeStyle = '#64748b';
+                    ctx.lineWidth = 1.8;
+                    ctx.strokeRect(item.x, item.y, item.w, item.h);
+                    ctx.fillStyle = '#0f172a';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.font = `700 ${geo.isA5 ? 15 : 19}px "Be Vietnam Pro", Arial`;
+                    ctx.fillText(item.title, item.x + item.w / 2, item.y + (geo.isA5 ? 14 : 18));
+                }
+                else if (item.type === 'qLabel') {
+                    ctx.fillStyle = '#0f172a';
+                    ctx.textAlign = 'right';
+                    ctx.textBaseline = 'middle';
+                    ctx.font = `700 ${geo.isA5 ? 16 : 21}px "Roboto Mono", monospace`;
+                    ctx.fillText(item.text, item.x, item.y);
+                }
+                else if (item.type === 'subLabel') {
+                    ctx.fillStyle = '#0f172a';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
+                    ctx.font = `700 ${geo.isA5 ? 15 : 19}px "Be Vietnam Pro", Arial`;
+                    ctx.fillText(item.text, item.x, item.y);
+                }
+            });
+
+            // Hàm vẽ 1 vòng tròn tô
+            const drawBubble = (b, isFilled) => {
+                ctx.beginPath();
+                ctx.arc(b.px, b.py, b.pr, 0, Math.PI * 2);
+                if (isFilled) {
+                    ctx.fillStyle = '#111827';
+                    ctx.fill();
+                } else {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fill();
+                    ctx.strokeStyle = '#334155';
+                    ctx.lineWidth = 1.8;
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#64748b';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.font = `600 ${Math.round(b.pr * 1.15)}px "Be Vietnam Pro", Arial`;
+                    ctx.fillText(b.label, b.px, b.py + 0.5);
+                }
+            };
+
+            // 3. Vẽ các vòng tròn Phần I
+            geo.part1Bubbles.forEach(q => {
+                const chosen = filledSample?.part1?.[q.qNum];
+                q.options.forEach(opt => {
+                    drawBubble(opt, chosen === opt.label);
+                });
+            });
+
+            // 4. Vẽ các vòng tròn Phần II
+            geo.part2Bubbles.forEach(q => {
+                const subAns = filledSample?.part2?.[q.qNum] || {};
+                q.subs.forEach(s => {
+                    const val = subAns[s.subLabel];
+                    drawBubble(s.trueBubble, val === 'Đ');
+                    drawBubble(s.falseBubble, val === 'S');
+                });
+            });
+
+            // 5. Vẽ các vòng tròn Phần III
+            geo.part3Bubbles.forEach(q => {
+                const strAns = (filledSample?.part3?.[q.qNum] || '').toString();
+                for (let c = 0; c < 4; c++) {
+                    const ch = strAns[c] || '';
+                    q.cols[c].forEach(b => {
+                        drawBubble(b, ch === b.label);
+                    });
+                }
+            });
+
+            // Chân trang nhận diện mẫu
+            ctx.fillStyle = '#64748b';
+            ctx.font = `500 ${geo.isA5 ? 14 : 18}px "Roboto Mono", monospace`;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'alphabetic';
+            ctx.fillText(`FORM-${geo.isA5 ? 'A5' : 'A4'}-P1:${cfg.part1Count}-P2:${cfg.part2Count}-P3:${cfg.part3Count}`, geo.scanLeft, geo.H - 22);
+            ctx.textAlign = 'right';
+            ctx.fillText('PHẠM HẬU -EDU • OMR & GEMINI AI VISION', geo.scanRight, geo.H - 22);
+
+            return geo;
+        }
+
+        // Render ra Canvas xem trước (Tự động ghép 2 phiếu A5 trên 1 tờ A4 ngang nếu bật tùy chọn)
+        function renderSheetToCanvas(targetCanvas, cfg, filledSample = null) {
+            const effectivePaper = resolveEffectivePaperSize(cfg);
+            const is2Up = (effectivePaper === 'A5') && Boolean(cfg.twoUpA4) && !filledSample;
+
+            if (!is2Up) {
+                return renderSingleOmrSheetToCanvas(targetCanvas, cfg, filledSample);
+            }
+
+            // Tạo 1 phiếu A5 đơn chuẩn 1480 x 2100 trước để lấy tọa độ hình học chuẩn xác
+            const singleCanvas = document.createElement('canvas');
+            const geo = renderSingleOmrSheetToCanvas(singleCanvas, cfg, null);
+
+            // Ghép 2 phiếu A5 song song trên tờ A4 nằm ngang (2970 x 2100 px)
+            const A4_LAND_W = 2970;
+            const A4_LAND_H = 2100;
+            targetCanvas.width = A4_LAND_W;
+            targetCanvas.height = A4_LAND_H;
+            const ctx = targetCanvas.getContext('2d');
+
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, A4_LAND_W, A4_LAND_H);
+
+            const halfW = A4_LAND_W / 2;
+            const offsetLeft = Math.round((halfW - singleCanvas.width) / 2);
+            const offsetRight = halfW + offsetLeft;
+
+            // Vẽ phiếu A5 bên trái & phiếu A5 bên phải
+            ctx.drawImage(singleCanvas, offsetLeft, 0);
+            ctx.drawImage(singleCanvas, offsetRight, 0);
+
+            // Vẽ đường cắt đôi nét đứt & biểu tượng cái kéo ở chính giữa tờ A4 ngang
+            const midX = A4_LAND_W / 2;
+            ctx.save();
+            ctx.setLineDash([18, 14]);
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(midX, 30);
+            ctx.lineTo(midX, A4_LAND_H - 30);
+            ctx.stroke();
+
+            ctx.setLineDash([]);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(midX - 24, A4_LAND_H / 2 - 42, 48, 84);
+            ctx.fillStyle = '#475569';
+            ctx.font = '700 28px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('✂', midX, A4_LAND_H / 2);
+            ctx.restore();
+
+            return geo;
+        }
+
+        function refreshOmrDesignAndSync() {
+            const canvas = document.getElementById('sheetPreviewCanvas');
+            activeSheetGeometry = renderSheetToCanvas(canvas, appState.config, null);
+
+            const effectivePaper = resolveEffectivePaperSize(appState.config);
+            const isA5 = effectivePaper === 'A5';
+            const is2Up = isA5 && Boolean(appState.config.twoUpA4);
+
+            // Cập nhật huy hiệu & khối tùy chọn ghép 2 phiếu A5 trên A4
+            const autoBadge = document.getElementById('autoPaperBadge');
+            const twoUpBox = document.getElementById('twoUpOptionBox');
+            const btn2UpPng = document.getElementById('btnDownload2UpPng');
+            const btnGrid = document.getElementById('downloadPngButtonsGrid');
+            const previewWrapper = document.getElementById('previewCanvasWrapper');
+
+            if (autoBadge) {
+                const modeLabel = appState.config.paperMode === 'AUTO' ? 'Tự động' : 'Cố định';
+                autoBadge.textContent = `${modeLabel}: ${effectivePaper}`;
+                autoBadge.className = isA5
+                    ? 'text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 text-[#059669]'
+                    : 'text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-blue-100 text-[#1e3a8a]';
+            }
+
+            if (twoUpBox) twoUpBox.classList.toggle('hidden', !isA5);
+            if (btn2UpPng) btn2UpPng.classList.toggle('hidden', !is2Up);
+            if (btnGrid) {
+                btnGrid.className = is2Up ? 'grid grid-cols-1 sm:grid-cols-2 gap-2' : 'grid grid-cols-1 gap-2';
+            }
+
+            const btnSingleText = document.getElementById('btnDownloadSingleText');
+            if (btnSingleText) {
+                btnSingleText.textContent = isA5 ? 'Tải ảnh phiếu đơn A5 (.PNG)' : 'Tải ảnh phiếu A4 (.PNG)';
+            }
+
+            const btnPrintText = document.getElementById('btnPrintText');
+            if (btnPrintText) {
+                btnPrintText.textContent = is2Up
+                    ? 'In 2 Phiếu A5 / Tờ A4 Ngang (PDF 1:1)'
+                    : `In Phiếu ${effectivePaper} / Lưu PDF (Chuẩn 1:1)`;
+            }
+
+            if (previewWrapper) {
+                if (is2Up) {
+                    previewWrapper.className = 'w-full max-w-[960px] pb-8 transition-all duration-200';
+                } else if (isA5) {
+                    previewWrapper.className = 'w-full max-w-[540px] pb-8 transition-all duration-200';
+                } else {
+                    previewWrapper.className = 'w-full max-w-[780px] pb-8 transition-all duration-200';
+                }
+            }
+
+            const totalQ = appState.config.part1Count + appState.config.part2Count + appState.config.part3Count;
+            document.getElementById('badgeTotalQ').textContent = `Tổng: ${totalQ} câu`;
+
+            if (is2Up) {
+                document.getElementById('previewMetaText').textContent = '2 Phiếu A5 ghép song song trên 1 tờ A4 ngang (297 × 210 mm) • Có đường cắt giữa';
+            } else if (isA5) {
+                document.getElementById('previewMetaText').textContent = 'Bản vẽ vector độ phân giải cao • Khổ A5 dọc (148 × 210 mm)';
+            } else {
+                document.getElementById('previewMetaText').textContent = 'Bản vẽ vector độ phân giải cao • Khổ A4 dọc (210 × 297 mm)';
+            }
+
+            const dynPrint = document.getElementById('dynamicPrintStyle');
+            if (is2Up) {
+                dynPrint.textContent = '@page { size: A4 landscape; margin: 0; }';
+            } else {
+                dynPrint.textContent = `@page { size: ${effectivePaper} portrait; margin: 0; }`;
+            }
+
+            const partsDesc = [];
+            if (appState.config.part1Count > 0) partsDesc.push(`${appState.config.part1Count} ABCD`);
+            if (appState.config.part2Count > 0) partsDesc.push(`${appState.config.part2Count} Đ/S`);
+            if (appState.config.part3Count > 0) partsDesc.push(`${appState.config.part3Count} TLN`);
+            const paperDesc = is2Up ? '2×A5 trên A4 ngang' : `Khổ ${effectivePaper}`;
+            document.getElementById('syncSummaryText').textContent = `${partsDesc.join(' + ') || '0 câu'} • ${paperDesc}`;
+
+            syncGradingTabUI();
+            saveAppState();
+        }
+
+        function printOmrSheet() {
+            const canvas = document.getElementById('sheetPreviewCanvas');
+            const printImg = document.getElementById('printImage');
+            printImg.src = canvas.toDataURL('image/png');
+            printImg.onload = () => {
+                window.print();
+            };
+        }
+
+        function downloadSingleBlankPng() {
+            const singleCanvas = document.createElement('canvas');
+            renderSingleOmrSheetToCanvas(singleCanvas, appState.config, null);
+            const effectivePaper = resolveEffectivePaperSize(appState.config);
+            const link = document.createElement('a');
+            link.download = `Phieu_OMR_Don_${effectivePaper}_${appState.config.part1Count}cau.png`;
+            link.href = singleCanvas.toDataURL('image/png');
+            link.click();
+            showToast(`Đã tải ảnh phiếu đơn ${effectivePaper} chuẩn tọa độ!`);
+        }
+
+        function download2UpBlankPng() {
+            const canvas = document.getElementById('sheetPreviewCanvas');
+            const link = document.createElement('a');
+            link.download = `Phieu_OMR_2xA5_Tren_A4_${appState.config.part1Count}cau.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            showToast('Đã tải tờ A4 ngang ghép 2 phiếu A5!');
+        }
+
+        // =========================================================================
+        // 3. QUẢN LÝ TAB, ĐÁP ÁN & CẤU HÌNH THANG ĐIỂM TÙY CHỈNH
+        // =========================================================================
+        function switchTab(tabNum) {
+            const btn1 = document.getElementById('tabBtn1');
+            const btn2 = document.getElementById('tabBtn2');
+            const sec1 = document.getElementById('tabContent1');
+            const sec2 = document.getElementById('tabContent2');
+
+            if (tabNum === 1) {
+                sec1.classList.remove('hidden');
+                sec1.classList.add('flex');
+                sec2.classList.add('hidden');
+                sec2.classList.remove('flex');
+
+                btn1.className = 'flex-1 md:flex-initial px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition cursor-pointer bg-white text-[#1e3a8a] shadow-sm';
+                btn2.className = 'flex-1 md:flex-initial px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition cursor-pointer text-blue-100 hover:text-white';
+            } else {
+                sec2.classList.remove('hidden');
+                sec2.classList.add('flex');
+                sec1.classList.add('hidden');
+                sec1.classList.remove('flex');
+
+                btn2.className = 'flex-1 md:flex-initial px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition cursor-pointer bg-white text-[#1e3a8a] shadow-sm';
+                btn1.className = 'flex-1 md:flex-initial px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition cursor-pointer text-blue-100 hover:text-white';
+                syncGradingTabUI();
+            }
+        }
+
+        function getCurrentKeyObj() {
+            const code = appState.grading.selectedCode;
+            if (!appState.grading.answerKeys[code]) {
+                appState.grading.answerKeys[code] = { part1: {}, part2: {}, part3: {} };
+            }
+            return appState.grading.answerKeys[code];
+        }
+
+        function syncGradingTabUI() {
+            const codeSelect = document.getElementById('examCodeSelect');
+            const codes = Object.keys(appState.grading.answerKeys);
+            codeSelect.innerHTML = codes.map(c => `<option value="${c}" ${c === appState.grading.selectedCode ? 'selected' : ''}>Mã đề: ${c}</option>`).join('');
+
+            const keyObj = getCurrentKeyObj();
+            const p1Count = appState.config.part1Count;
+            const p2Count = appState.config.part2Count;
+            const p3Count = appState.config.part3Count;
+
+            // --- Phần I ---
+            const ed1 = document.getElementById('keyEditorPart1');
+            if (p1Count > 0) {
+                ed1.classList.remove('hidden');
+                let filled1 = 0;
+                let str = '';
+                let gridHtml = '';
+                for (let q = 1; q <= p1Count; q++) {
+                    const ans = keyObj.part1[q] || '';
+                    if (ans) filled1++;
+                    str += ans || '-';
+                    const btns = ['A', 'B', 'C', 'D'].map(ch => {
+                        const active = ans === ch;
+                        return `<button type="button" onclick="setPart1Answer(${q}, '${ch}')"
+                            class="w-6 h-6 rounded text-[11px] font-bold transition cursor-pointer ${active ? 'bg-[#1e3a8a] text-white' : 'bg-white border border-slate-300 text-slate-600 hover:bg-blue-50'}">${ch}</button>`;
+                    }).join('');
+                    gridHtml += `
+                        <div class="flex items-center justify-between bg-white px-2 py-1 rounded-lg border border-slate-200">
+                            <span class="font-mono-code text-xs font-bold text-slate-700">C.${String(q).padStart(2, '0')}</span>
+                            <div class="flex items-center gap-1">${btns}</div>
+                        </div>
+                    `;
+                }
+                document.getElementById('part1KeyProgress').textContent = `${filled1}/${p1Count}`;
+                document.getElementById('quickKeyStringInput').value = str.replace(/-+$/g, '');
+                document.getElementById('part1GridContainer').innerHTML = gridHtml;
+            } else {
+                ed1.classList.add('hidden');
+            }
+
+            // --- Phần II ---
+            const ed2 = document.getElementById('keyEditorPart2');
+            if (p2Count > 0) {
+                ed2.classList.remove('hidden');
+                let html2 = '';
+                for (let q = 1; q <= p2Count; q++) {
+                    if (!keyObj.part2[q]) keyObj.part2[q] = {};
+                    const subsHtml = ['a', 'b', 'c', 'd'].map(sub => {
+                        const val = keyObj.part2[q][sub] || '';
+                        return `
+                            <div class="flex items-center gap-1 bg-white px-1.5 py-1 rounded border border-slate-200">
+                                <span class="text-[11px] font-bold text-slate-700">${sub})</span>
+                                <button type="button" onclick="setPart2Answer(${q}, '${sub}', 'Đ')"
+                                    class="px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer ${val === 'Đ' ? 'bg-[#059669] text-white' : 'bg-slate-100 text-slate-600'}">Đ</button>
+                                <button type="button" onclick="setPart2Answer(${q}, '${sub}', 'S')"
+                                    class="px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer ${val === 'S' ? 'bg-[#dc2626] text-white' : 'bg-slate-100 text-slate-600'}">S</button>
+                            </div>
+                        `;
+                    }).join('');
+                    html2 += `
+                        <div class="space-y-1">
+                            <div class="text-xs font-bold text-[#1e3a8a]">Câu ${q}:</div>
+                            <div class="grid grid-cols-4 gap-1">${subsHtml}</div>
+                        </div>
+                    `;
+                }
+                document.getElementById('part2GridContainer').innerHTML = html2;
+            } else {
+                ed2.classList.add('hidden');
+            }
+
+            // --- Phần III ---
+            const ed3 = document.getElementById('keyEditorPart3');
+            if (p3Count > 0) {
+                ed3.classList.remove('hidden');
+                let html3 = '';
+                for (let q = 1; q <= p3Count; q++) {
+                    const val = keyObj.part3[q] || '';
+                    html3 += `
+                        <div class="flex items-center justify-between gap-2 bg-white p-2 rounded-lg border border-slate-200">
+                            <span class="text-xs font-bold text-slate-700 shrink-0">Câu ${q}:</span>
+                            <input type="text" maxlength="4" value="${val}" onchange="setPart3Answer(${q}, this.value)"
+                                placeholder="VD: -2,5"
+                                class="w-full rounded border border-slate-300 px-2 py-1 text-right font-mono-code font-bold text-xs text-[#1e3a8a] focus:border-[#1e3a8a] focus:outline-none">
+                        </div>
+                    `;
+                }
+                document.getElementById('part3GridContainer').innerHTML = html3;
+            } else {
+                ed3.classList.add('hidden');
+            }
+
+            // Cập nhật lại các trường Thang điểm nếu đang ở chế độ tự chia đều
+            if (appState.grading.scorePreset === 'even10' || appState.grading.scorePreset === 'even100') {
+                applyScorePreset(true);
+            } else {
+                updateConfiguredScoreSummary();
+            }
+        }
+
+        // Các hàm điều khiển Thang điểm tùy chỉnh
+        function updateConfiguredScoreSummary() {
+            const p1 = Number(appState.grading.ptsPart1) || 0;
+            const p2 = Number(appState.grading.ptsPart2) || 0;
+            const p3 = Number(appState.grading.ptsPart3) || 0;
+
+            document.getElementById('scorePresetSelect').value = appState.grading.scorePreset || 'standard';
+            document.getElementById('ptsPart1Input').value = p1;
+            document.getElementById('ptsPart2Input').value = p2;
+            document.getElementById('ptsPart3Input').value = p3;
+            document.getElementById('part2ModeSelect').value = appState.grading.part2Mode || 'progressive';
+
+            const totalConfigured = +(
+                appState.config.part1Count * p1 +
+                appState.config.part2Count * p2 +
+                appState.config.part3Count * p3
+            ).toFixed(2);
+
+            document.getElementById('configuredTotalScoreLabel').textContent = `${totalConfigured.toFixed(2)} điểm`;
+
+            const warnBanner = document.getElementById('scoreWarningBanner');
+            const totalBox = document.getElementById('configuredTotalBox');
+            const isStandard10 = Math.abs(totalConfigured - 10) < 0.01;
+            const isStandard100 = appState.grading.scorePreset === 'even100' && Math.abs(totalConfigured - 100) < 0.05;
+
+            if (!isStandard10 && !isStandard100 && totalConfigured > 0) {
+                warnBanner.classList.remove('hidden');
+                document.getElementById('scoreWarningText').textContent =
+                    `Lưu ý: Tổng điểm cấu hình hiện là ${totalConfigured.toFixed(2)}đ (khác thang 10.00đ).`;
+                totalBox.className = 'p-2.5 rounded-xl bg-amber-50 border border-amber-300 flex items-center justify-between';
+            } else {
+                warnBanner.classList.add('hidden');
+                totalBox.className = 'p-2.5 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-between';
+            }
+        }
+
+        function applyScorePreset(silent = false) {
+            const mode = document.getElementById('scorePresetSelect').value;
+            appState.grading.scorePreset = mode;
+
+            const totalQ = appState.config.part1Count + appState.config.part2Count + appState.config.part3Count;
+            if (mode === 'standard') {
+                appState.grading.ptsPart1 = 0.25;
+                appState.grading.ptsPart2 = 1.0;
+                appState.grading.ptsPart3 = 0.5;
+            } else if (mode === 'even10') {
+                const perQ = totalQ > 0 ? +(10 / totalQ).toFixed(4) : 0;
+                appState.grading.ptsPart1 = perQ;
+                appState.grading.ptsPart2 = perQ;
+                appState.grading.ptsPart3 = perQ;
+            } else if (mode === 'even100') {
+                const perQ = totalQ > 0 ? +(100 / totalQ).toFixed(4) : 0;
+                appState.grading.ptsPart1 = perQ;
+                appState.grading.ptsPart2 = perQ;
+                appState.grading.ptsPart3 = perQ;
+            }
+
+            updateConfiguredScoreSummary();
+            saveAppState();
+            if (!silent) showToast('Đã cập nhật cấu hình thang điểm!');
+        }
+
+        function autoDistributePoints10() {
+            document.getElementById('scorePresetSelect').value = 'even10';
+            applyScorePreset(false);
+        }
+
+        function setPart1Answer(q, ch) {
+            const keyObj = getCurrentKeyObj();
+            keyObj.part1[q] = (keyObj.part1[q] === ch) ? '' : ch;
+            saveAppState();
+            syncGradingTabUI();
+        }
+
+        function setPart2Answer(q, sub, val) {
+            const keyObj = getCurrentKeyObj();
+            if (!keyObj.part2[q]) keyObj.part2[q] = {};
+            keyObj.part2[q][sub] = (keyObj.part2[q][sub] === val) ? '' : val;
+            saveAppState();
+            syncGradingTabUI();
+        }
+
+        function setPart3Answer(q, val) {
+            const keyObj = getCurrentKeyObj();
+            keyObj.part3[q] = val.trim().replace('.', ',').slice(0, 4);
+            saveAppState();
+        }
+
+        function onSelectExamCode() {
+            appState.grading.selectedCode = document.getElementById('examCodeSelect').value;
+            saveAppState();
+            syncGradingTabUI();
+        }
+
+        function addNewExamCode() {
+            const existing = Object.keys(appState.grading.answerKeys);
+            const digits = appState.config.codeDigits || 3;
+            let nextNum = digits === 4 ? 1001 : 101;
+            while (existing.includes(String(nextNum))) nextNum++;
+            const newCode = String(nextNum);
+            appState.grading.answerKeys[newCode] = { part1: {}, part2: {}, part3: {} };
+            appState.grading.selectedCode = newCode;
+            saveAppState();
+            syncGradingTabUI();
+            showToast(`Đã thêm Mã đề ${newCode}`);
+        }
+
+        function deleteCurrentExamCode() {
+            const codes = Object.keys(appState.grading.answerKeys);
+            if (codes.length <= 1) {
+                showToast('Cần giữ lại ít nhất 1 Mã đề!');
+                return;
+            }
+            delete appState.grading.answerKeys[appState.grading.selectedCode];
+            appState.grading.selectedCode = Object.keys(appState.grading.answerKeys)[0];
+            saveAppState();
+            syncGradingTabUI();
+            showToast('Đã xóa mã đề!');
+        }
+
+        function generateRandomAnswerKey() {
+            const keyObj = getCurrentKeyObj();
+            const opts = ['A', 'B', 'C', 'D'];
+            for (let q = 1; q <= appState.config.part1Count; q++) {
+                keyObj.part1[q] = opts[Math.floor(Math.random() * 4)];
+            }
+            for (let q = 1; q <= appState.config.part2Count; q++) {
+                keyObj.part2[q] = {
+                    a: Math.random() > 0.5 ? 'Đ' : 'S',
+                    b: Math.random() > 0.5 ? 'Đ' : 'S',
+                    c: Math.random() > 0.5 ? 'Đ' : 'S',
+                    d: Math.random() > 0.5 ? 'Đ' : 'S'
+                };
+            }
+            const samples3 = ['-2,5', '12', '0,75', '105', '-8', '3,14', '24', '1,5', '40', '-1,2'];
+            for (let q = 1; q <= appState.config.part3Count; q++) {
+                keyObj.part3[q] = samples3[(q - 1) % samples3.length];
+            }
+            saveAppState();
+            syncGradingTabUI();
+            showToast(`Đã tạo nhanh đáp án mẫu cho Mã đề ${appState.grading.selectedCode}!`);
+        }
+
+        // =========================================================================
+        // 4. THUẬT TOÁN NHẬN DIỆN 4 GÓC, ĐỌC MÃ ĐỀ VIẾT TAY (GEMINI AI / OFFLINE) & CHẤM ĐIỂM
+        // =========================================================================
+        function detectFourCornersFromImageData(imgData, width, height) {
+            const data = imgData.data;
+            const roiRatio = 0.24;
+            const roiW = Math.floor(width * roiRatio);
+            const roiH = Math.floor(height * roiRatio);
+
+            const findDarkCentroidInBox = (x0, y0, x1, y1, defaultX, defaultY) => {
+                let sumX = 0, sumY = 0, count = 0;
+                const step = Math.max(1, Math.floor(Math.min(width, height) / 450));
+                for (let y = y0; y < y1; y += step) {
+                    for (let x = x0; x < x1; x += step) {
+                        const idx = (y * width + x) * 4;
+                        const lum = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+                        if (lum < 75) {
+                            sumX += x;
+                            sumY += y;
+                            count++;
+                        }
+                    }
+                }
+                if (count < 12) return { x: defaultX, y: defaultY, detected: false };
+                return { x: sumX / count, y: sumY / count, detected: true };
+            };
+
+            const geo = activeSheetGeometry || buildSheetGeometry(appState.config);
+            const defTL = { x: (geo.scanLeft / geo.W) * width, y: (geo.scanTop / geo.H) * height };
+            const defTR = { x: (geo.scanRight / geo.W) * width, y: (geo.scanTop / geo.H) * height };
+            const defBL = { x: (geo.scanLeft / geo.W) * width, y: (geo.scanBottom / geo.H) * height };
+            const defBR = { x: (geo.scanRight / geo.W) * width, y: (geo.scanBottom / geo.H) * height };
+
+            const tl = findDarkCentroidInBox(4, 4, roiW, roiH, defTL.x, defTL.y);
+            const tr = findDarkCentroidInBox(width - roiW, 4, width - 4, roiH, defTR.x, defTR.y);
+            const bl = findDarkCentroidInBox(4, height - roiH, roiW, height - 4, defBL.x, defBL.y);
+            const br = findDarkCentroidInBox(width - roiW, height - roiH, width - 4, height - 4, defBR.x, defBR.y);
+
+            return { tl, tr, bl, br };
+        }
+
+        function mapNormalizedToImagePoint(nx, ny, corners) {
+            const topX = corners.tl.x * (1 - nx) + corners.tr.x * nx;
+            const topY = corners.tl.y * (1 - nx) + corners.tr.y * nx;
+            const botX = corners.bl.x * (1 - nx) + corners.br.x * nx;
+            const botY = corners.bl.y * (1 - nx) + corners.br.y * nx;
+
+            return {
+                x: topX * (1 - ny) + botX * ny,
+                y: topY * (1 - ny) + botY * ny
+            };
+        }
+
+        function measureBubbleFillScore(imgData, width, height, cx, cy, rPx) {
+            const data = imgData.data;
+            const rInner = Math.max(2, rPx * 0.65);
+            const rOuterStart = rPx * 1.25;
+            const rOuterEnd = rPx * 1.75;
+
+            let innerSum = 0, innerCnt = 0;
+            let bgSum = 0, bgCnt = 0;
+
+            const minX = Math.max(0, Math.floor(cx - rOuterEnd));
+            const maxX = Math.min(width - 1, Math.ceil(cx + rOuterEnd));
+            const minY = Math.max(0, Math.floor(cy - rOuterEnd));
+            const maxY = Math.min(height - 1, Math.ceil(cy + rOuterEnd));
+
+            for (let y = minY; y <= maxY; y++) {
+                for (let x = minX; x <= maxX; x++) {
+                    const dx = x - cx;
+                    const dy = y - cy;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const idx = (y * width + x) * 4;
+                    const lum = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+
+                    if (dist <= rInner) {
+                        innerSum += lum;
+                        innerCnt++;
+                    } else if (dist >= rOuterStart && dist <= rOuterEnd) {
+                        bgSum += lum;
+                        bgCnt++;
+                    }
+                }
+            }
+
+            if (innerCnt === 0) return 0;
+            const innerAvg = innerSum / innerCnt;
+            const bgAvg = bgCnt > 0 ? (bgSum / bgCnt) : 245;
+            const darknessRatio = Math.max(0, (bgAvg - innerAvg) / Math.max(60, bgAvg));
+            return Math.min(1, darknessRatio * 1.35);
+        }
+
+        // Gọi Gemini Vision API (gemini-3-flash-preview) nhận diện chữ số viết tay Mã đề
+        async function recognizeExamCodeWithGemini(croppedCanvas, expectedDigits) {
+            const runtimeKey = (typeof process !== 'undefined' && process.env && process.env.GEMINI_API_KEY)
+                ? process.env.GEMINI_API_KEY
+                : '';
+            const apiKey = (appState.grading.geminiApiKey || runtimeKey || '').trim();
+            if (!apiKey) return null;
+
+            const base64Data = croppedCanvas.toDataURL('image/png').split(',')[1];
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+            const prompt = `Đây là ảnh cắt cận cảnh vùng ô viết tay MÃ ĐỀ THI bằng bút mực gồm đúng ${expectedDigits} chữ số (0-9). Hãy đọc chính xác dãy ${expectedDigits} chữ số viết tay (bỏ qua số in mờ nhạt làm nền nếu có). Trả về đúng định dạng JSON.`;
+
+            const payload = {
+                contents: [{
+                    parts: [
+                        { text: prompt },
+                        { inlineData: { mimeType: 'image/png', data: base64Data } }
+                    ]
+                }],
+                generationConfig: {
+                    responseMimeType: 'application/json',
+                    responseSchema: {
+                        type: 'OBJECT',
+                        properties: {
+                            examCode: { type: 'STRING' },
+                            confidence: { type: 'STRING' }
+                        },
+                        required: ['examCode', 'confidence']
+                    }
+                }
+            };
+
+            const delays = [1000, 2000, 4000];
+            for (let attempt = 0; attempt <= delays.length; attempt++) {
+                try {
+                    const controller = new AbortController();
+                    const timer = setTimeout(() => controller.abort(), 9000);
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                        signal: controller.signal
+                    });
+                    clearTimeout(timer);
+
+                    if (!response.ok) {
+                        if (response.status === 429 || response.status >= 500) {
+                            throw new Error(`HTTP ${response.status}`);
+                        }
+                        return null;
+                    }
+
+                    const result = await response.json();
+                    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (!text) return null;
+                    const parsed = JSON.parse(text);
+                    const cleaned = String(parsed.examCode || '').replace(/\D/g, '').slice(0, expectedDigits);
+                    if (cleaned.length > 0) {
+                        return {
+                            code: cleaned,
+                            source: 'Gemini AI OCR',
+                            confidence: parsed.confidence || 'Cao'
+                        };
+                    }
+                    return null;
+                } catch (err) {
+                    if (attempt < delays.length) {
+                        await new Promise(r => setTimeout(r, delays[attempt]));
+                    } else {
+                        return null;
+                    }
+                }
+            }
+            return null;
+        }
+
+        // Nhận diện chữ số viết tay bằng bút mực từ vùng crop Mã đề (Gemini AI trước, tự động dự phòng Offline)
+        async function recognizeHandwrittenExamCode(sourceCanvas, geo, corners) {
+            const cropCanvas = document.getElementById('croppedCodeCanvas');
+            const cCtx = cropCanvas.getContext('2d');
+
+            const cb = geo.codeCropBox;
+            const pTL = mapNormalizedToImagePoint(cb.nx, cb.ny, corners);
+            const pBR = mapNormalizedToImagePoint(cb.nx + cb.nw, cb.ny + cb.nh, corners);
+            const sx = Math.max(0, Math.floor(pTL.x));
+            const sy = Math.max(0, Math.floor(pTL.y));
+            const sw = Math.max(20, Math.floor(pBR.x - pTL.x));
+            const sh = Math.max(12, Math.floor(pBR.y - pTL.y));
+
+            cropCanvas.width = 220;
+            cropCanvas.height = 84;
+            cCtx.fillStyle = '#ffffff';
+            cCtx.fillRect(0, 0, cropCanvas.width, cropCanvas.height);
+            cCtx.drawImage(sourceCanvas, sx, sy, sw, sh, 0, 0, cropCanvas.width, cropCanvas.height);
+
+            // 1. Ưu tiên gọi Gemini Vision API nếu người dùng bật tùy chọn và có API Key
+            if (appState.grading.geminiOcrEnabled && navigator.onLine) {
+                const geminiRes = await recognizeExamCodeWithGemini(cropCanvas, geo.codeBoxes.length);
+                if (geminiRes && geminiRes.code) {
+                    return {
+                        code: geminiRes.code,
+                        source: geminiRes.source,
+                        confidence: geminiRes.confidence
+                    };
+                }
+            }
+
+            // 2. Dự phòng Offline: Lọc nét bút mực xanh/đen tương phản cao cho từng ô chữ số
+            const recognizedDigits = [];
+            let inkBoxesFound = 0;
+
+            for (let i = 0; i < geo.codeBoxes.length; i++) {
+                const box = geo.codeBoxes[i];
+                const bTL = mapNormalizedToImagePoint(box.nx, box.ny, corners);
+                const bBR = mapNormalizedToImagePoint(box.nx + box.nw, box.ny + box.nh, corners);
+
+                const padX = (bBR.x - bTL.x) * 0.14;
+                const padY = (bBR.y - bTL.y) * 0.14;
+                const bx = Math.max(0, Math.floor(bTL.x + padX));
+                const by = Math.max(0, Math.floor(bTL.y + padY));
+                const bw = Math.max(8, Math.floor((bBR.x - bTL.x) - 2 * padX));
+                const bh = Math.max(10, Math.floor((bBR.y - bTL.y) - 2 * padY));
+
+                const cellCanvas = document.createElement('canvas');
+                cellCanvas.width = 48;
+                cellCanvas.height = 64;
+                const cellCtx = cellCanvas.getContext('2d');
+                cellCtx.fillStyle = '#ffffff';
+                cellCtx.fillRect(0, 0, 48, 64);
+                cellCtx.drawImage(sourceCanvas, bx, by, bw, bh, 4, 4, 40, 56);
+
+                const dImg = cellCtx.getImageData(0, 0, 48, 64);
+                const px = dImg.data;
+                let inkCount = 0;
+                const binary = new Uint8Array(48 * 64);
+
+                for (let p = 0; p < binary.length; p++) {
+                    const r = px[p * 4];
+                    const g = px[p * 4 + 1];
+                    const b = px[p * 4 + 2];
+                    const isBlueInk = (b - r > 22) && (b > 70) && (r < 175);
+                    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                    const isDarkInk = lum < 135;
+
+                    if (isBlueInk || isDarkInk) {
+                        binary[p] = 1;
+                        inkCount++;
+                    }
+                }
+
+                if (inkCount > 28) {
+                    inkBoxesFound++;
+                    recognizedDigits.push(classifyDigitFromBinary(binary, 48, 64));
+                } else {
+                    recognizedDigits.push('');
+                }
+            }
+
+            const rawDetected = recognizedDigits.join('');
+            const fallbackCode = appState.grading.selectedCode || Object.keys(appState.grading.answerKeys)[0] || '101';
+
+            if (inkBoxesFound === geo.codeBoxes.length && rawDetected.length === geo.codeBoxes.length) {
+                return { code: rawDetected, source: 'Nét mực Offline', confidence: 'Trung bình' };
+            }
+
+            return {
+                code: fallbackCode,
+                source: inkBoxesFound > 0 ? `Chưa đủ nét (${rawDetected || '?'})` : 'Mặc định',
+                confidence: inkBoxesFound > 0 ? 'Cần kiểm tra' : 'Chưa viết'
+            };
+        }
+
+        function classifyDigitFromBinary(bin, w, h) {
+            let minX = w, maxX = 0, minY = h, maxY = 0;
+            let total = 0;
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    if (bin[y * w + x]) {
+                        total++;
+                        if (x < minX) minX = x;
+                        if (x > maxX) maxX = x;
+                        if (y < minY) minY = y;
+                        if (y > maxY) maxY = y;
+                    }
+                }
+            }
+            if (total === 0) return '0';
+            const bw = Math.max(1, maxX - minX + 1);
+            const bh = Math.max(1, maxY - minY + 1);
+            const aspect = bw / bh;
+            if (aspect < 0.36) return '1';
+
+            let topHalf = 0, botHalf = 0, leftHalf = 0, rightHalf = 0;
+            const midX = (minX + maxX) / 2;
+            const midY = (minY + maxY) / 2;
+            for (let y = minY; y <= maxY; y++) {
+                for (let x = minX; x <= maxX; x++) {
+                    if (bin[y * w + x]) {
+                        if (y < midY) topHalf++; else botHalf++;
+                        if (x < midX) leftHalf++; else rightHalf++;
+                    }
+                }
+            }
+
+            const topRatio = topHalf / total;
+            const rightRatio = rightHalf / total;
+            if (topRatio > 0.62 && rightRatio > 0.56) return '7';
+            if (topRatio > 0.58 && rightRatio <= 0.52) return '5';
+            if (topRatio < 0.43 && leftHalf / total > 0.54) return '6';
+            if (topRatio < 0.44 && rightRatio > 0.55) return '4';
+            if (rightRatio > 0.60) return '3';
+            if (Math.abs(topRatio - 0.5) < 0.07 && Math.abs(rightRatio - 0.5) < 0.08) {
+                const cX = Math.round(midX);
+                const cY = Math.round(midY);
+                const centerInk = bin[cY * w + cX] || bin[cY * w + cX + 1] || bin[(cY + 1) * w + cX];
+                return centerInk ? '8' : '0';
+            }
+            return '2';
+        }
+
+        // Hàm chấm điểm dựa trên các lựa chọn đã nhận diện & thang điểm hiện tại
+        function evaluateStudentAnswers(detectedData, examCode) {
+            const keyObj = appState.grading.answerKeys[examCode]
+                || appState.grading.answerKeys[appState.grading.selectedCode]
+                || { part1: {}, part2: {}, part3: {} };
+
+            const pts1 = Number(appState.grading.ptsPart1) || 0;
+            const pts2 = Number(appState.grading.ptsPart2) || 0;
+            const pts3 = Number(appState.grading.ptsPart3) || 0;
+            const p2Mode = appState.grading.part2Mode || 'progressive';
+
+            let totalScore = 0;
+            let maxPossibleScore = 0;
+            let correctCount = 0;
+            let totalQuestions = appState.config.part1Count + appState.config.part2Count + appState.config.part3Count;
+            const wrongDetails = [];
+            const overlays = [];
+
+            // 1. Chấm Phần I (ABCD)
+            detectedData.part1.forEach(item => {
+                maxPossibleScore += pts1;
+                const truth = keyObj.part1[item.qNum] || '';
+                if (item.selected.length === 1) {
+                    const chosen = item.selected[0];
+                    if (truth && chosen.label === truth) {
+                        correctCount++;
+                        totalScore += pts1;
+                        overlays.push({ type: 'correct', px: chosen.px, py: chosen.py, pr: chosen.pr });
+                    } else {
+                        overlays.push({ type: 'wrong', px: chosen.px, py: chosen.py, pr: chosen.pr });
+                        if (truth) {
+                            const rightOpt = item.allOptions.find(o => o.label === truth);
+                            if (rightOpt) overlays.push({ type: 'truth', px: rightOpt.px, py: rightOpt.py, pr: rightOpt.pr });
+                        }
+                        wrongDetails.push(`C.${item.qNum}(${chosen.label}→${truth || '?'})`);
+                    }
+                } else if (item.selected.length > 1) {
+                    item.selected.forEach(s => overlays.push({ type: 'wrong', px: s.px, py: s.py, pr: s.pr }));
+                    wrongDetails.push(`C.${item.qNum}(Tô đúp)`);
+                } else {
+                    if (truth) {
+                        const rightOpt = item.allOptions.find(o => o.label === truth);
+                        if (rightOpt) overlays.push({ type: 'truth', px: rightOpt.px, py: rightOpt.py, pr: rightOpt.pr });
+                    }
+                    wrongDetails.push(`C.${item.qNum}(Trống)`);
+                }
+            });
+
+            // 2. Chấm Phần II (Đúng/Sai)
+            detectedData.part2.forEach(item => {
+                maxPossibleScore += pts2;
+                const truthObj = keyObj.part2[item.qNum] || {};
+                let subCorrect = 0;
+
+                item.subs.forEach(s => {
+                    const tVal = truthObj[s.subLabel] || '';
+                    if (s.picked === 'Đ' || s.picked === 'S') {
+                        const pickedBubble = s.picked === 'Đ' ? s.trueBubble : s.falseBubble;
+                        if (tVal && s.picked === tVal) {
+                            subCorrect++;
+                            overlays.push({ type: 'correct', px: pickedBubble.px, py: pickedBubble.py, pr: pickedBubble.pr });
+                        } else {
+                            overlays.push({ type: 'wrong', px: pickedBubble.px, py: pickedBubble.py, pr: pickedBubble.pr });
+                            if (tVal) {
+                                const tb = tVal === 'Đ' ? s.trueBubble : s.falseBubble;
+                                overlays.push({ type: 'truth', px: tb.px, py: tb.py, pr: tb.pr });
+                            }
+                        }
+                    } else if (s.picked === 'DUP') {
+                        overlays.push({ type: 'wrong', px: s.trueBubble.px, py: s.trueBubble.py, pr: s.trueBubble.pr });
+                        overlays.push({ type: 'wrong', px: s.falseBubble.px, py: s.falseBubble.py, pr: s.falseBubble.pr });
+                    } else if (tVal) {
+                        const tb = tVal === 'Đ' ? s.trueBubble : s.falseBubble;
+                        overlays.push({ type: 'truth', px: tb.px, py: tb.py, pr: tb.pr });
+                    }
+                });
+
+                let qScore = 0;
+                if (p2Mode === 'equal') {
+                    qScore = pts2 * (subCorrect / 4);
+                } else {
+                    const ratios = { 0: 0, 1: 0.1, 2: 0.25, 3: 0.5, 4: 1.0 };
+                    qScore = pts2 * (ratios[subCorrect] || 0);
+                }
+
+                totalScore += qScore;
+                if (subCorrect === 4) correctCount++;
+                else wrongDetails.push(`P2.C${item.qNum}(${subCorrect}/4 ý)`);
+            });
+
+            // 3. Chấm Phần III (Trả lời ngắn)
+            detectedData.part3.forEach(item => {
+                maxPossibleScore += pts3;
+                const truthStr = (keyObj.part3[item.qNum] || '').toString().trim();
+
+                item.colResults.forEach((cr, c) => {
+                    const tChar = truthStr[c] || '';
+                    if (cr.picked) {
+                        if (tChar && cr.picked.label === tChar) {
+                            overlays.push({ type: 'correct', px: cr.picked.px, py: cr.picked.py, pr: cr.picked.pr });
+                        } else {
+                            overlays.push({ type: 'wrong', px: cr.picked.px, py: cr.picked.py, pr: cr.picked.pr });
+                            if (tChar) {
+                                const tb = cr.colBubbles.find(b => b.label === tChar);
+                                if (tb) overlays.push({ type: 'truth', px: tb.px, py: tb.py, pr: tb.pr });
+                            }
+                        }
+                    } else if (tChar) {
+                        const tb = cr.colBubbles.find(b => b.label === tChar);
+                        if (tb) overlays.push({ type: 'truth', px: tb.px, py: tb.py, pr: tb.pr });
+                    }
+                });
+
+                if (truthStr && item.studentStr === truthStr) {
+                    correctCount++;
+                    totalScore += pts3;
+                } else {
+                    wrongDetails.push(`P3.C${item.qNum}("${item.studentStr || '∅'}"→"${truthStr || '?'}")`);
+                }
+            });
+
+            const roundedScore = Math.round(totalScore * 100) / 100;
+            const roundedMax = Math.round(maxPossibleScore * 100) / 100;
+
+            return {
+                score: roundedScore,
+                maxPossibleScore: roundedMax,
+                correctCount,
+                totalQuestions,
+                wrongDetails,
+                overlays
+            };
+        }
+
+        function renderGradedOverlayCanvas(sourceCanvas, overlays, examCode, scoreText) {
+            const outCanvas = document.getElementById('gradedResultCanvas');
+            outCanvas.width = sourceCanvas.width;
+            outCanvas.height = sourceCanvas.height;
+            const outCtx = outCanvas.getContext('2d');
+            outCtx.drawImage(sourceCanvas, 0, 0);
+
+            overlays.forEach(ov => {
+                outCtx.beginPath();
+                outCtx.arc(ov.px, ov.py, ov.pr * 1.18, 0, Math.PI * 2);
+                if (ov.type === 'correct') {
+                    outCtx.fillStyle = 'rgba(5, 150, 105, 0.35)';
+                    outCtx.fill();
+                    outCtx.strokeStyle = '#059669';
+                    outCtx.lineWidth = Math.max(2.5, ov.pr * 0.25);
+                    outCtx.stroke();
+                } else if (ov.type === 'wrong') {
+                    outCtx.fillStyle = 'rgba(220, 38, 38, 0.35)';
+                    outCtx.fill();
+                    outCtx.strokeStyle = '#dc2626';
+                    outCtx.lineWidth = Math.max(2.5, ov.pr * 0.25);
+                    outCtx.stroke();
+                } else if (ov.type === 'truth') {
+                    outCtx.strokeStyle = '#2563eb';
+                    outCtx.lineWidth = Math.max(2.5, ov.pr * 0.25);
+                    outCtx.stroke();
+                }
+            });
+
+            // Tem điểm số nổi bật góc trên trái ảnh phiếu
+            const badgeW = Math.max(260, outCanvas.width * 0.24);
+            const badgeH = Math.max(76, outCanvas.height * 0.055);
+            outCtx.fillStyle = 'rgba(30, 58, 138, 0.92)';
+            outCtx.beginPath();
+            outCtx.roundRect(18, 18, badgeW, badgeH, 14);
+            outCtx.fill();
+
+            outCtx.fillStyle = '#ffffff';
+            outCtx.textAlign = 'left';
+            outCtx.textBaseline = 'middle';
+            outCtx.font = `800 ${Math.round(badgeH * 0.42)}px "Be Vietnam Pro", Arial`;
+            outCtx.fillText(`ĐIỂM: ${scoreText}`, 34, 18 + badgeH * 0.38);
+
+            outCtx.fillStyle = '#6ee7b7';
+            outCtx.font = `700 ${Math.round(badgeH * 0.24)}px "Be Vietnam Pro", Arial`;
+            outCtx.fillText(`MÃ ĐỀ: ${examCode}`, 34, 18 + badgeH * 0.76);
+
+            return outCanvas.toDataURL('image/jpeg', 0.85);
+        }
+
+        async function processAndGradeCanvasImage(sourceCanvas, labelPrefix = 'Phiếu') {
+            const t0 = performance.now();
+            const w = sourceCanvas.width;
+            const h = sourceCanvas.height;
+            const ctx = sourceCanvas.getContext('2d');
+            const imgData = ctx.getImageData(0, 0, w, h);
+
+            const geo = activeSheetGeometry || buildSheetGeometry(appState.config);
+            const corners = detectFourCornersFromImageData(imgData, w, h);
+            const thresh = (appState.grading.threshold || 45) / 100;
+
+            // 1. Đọc Mã đề viết tay bằng bút mực (Gemini Vision AI hoặc Offline)
+            const ocrRes = await recognizeHandwrittenExamCode(sourceCanvas, geo, corners);
+            const detectedCode = ocrRes.code;
+
+            const scaleX = Math.hypot(corners.tr.x - corners.tl.x, corners.tr.y - corners.tl.y) / geo.scanW;
+            const detectedData = { part1: [], part2: [], part3: [] };
+
+            // 2. Đọc Phần I
+            geo.part1Bubbles.forEach(q => {
+                const scored = q.options.map(opt => {
+                    const pt = mapNormalizedToImagePoint(opt.nx, opt.ny, corners);
+                    const rImg = Math.max(3, opt.pr * scaleX);
+                    const fill = measureBubbleFillScore(imgData, w, h, pt.x, pt.y, rImg);
+                    return { label: opt.label, fill, px: pt.x, py: pt.y, pr: rImg };
+                });
+                const selected = scored.filter(s => s.fill >= thresh);
+                detectedData.part1.push({ qNum: q.qNum, selected, allOptions: scored });
+            });
+
+            // 3. Đọc Phần II
+            geo.part2Bubbles.forEach(q => {
+                const subs = q.subs.map(s => {
+                    const pT = mapNormalizedToImagePoint(s.trueBubble.nx, s.trueBubble.ny, corners);
+                    const pF = mapNormalizedToImagePoint(s.falseBubble.nx, s.falseBubble.ny, corners);
+                    const rImg = Math.max(3, s.trueBubble.pr * scaleX);
+                    const fT = measureBubbleFillScore(imgData, w, h, pT.x, pT.y, rImg);
+                    const fF = measureBubbleFillScore(imgData, w, h, pF.x, pF.y, rImg);
+
+                    let picked = '';
+                    if (fT >= thresh && fF < thresh) picked = 'Đ';
+                    else if (fF >= thresh && fT < thresh) picked = 'S';
+                    else if (fT >= thresh && fF >= thresh) picked = 'DUP';
+
+                    return {
+                        subLabel: s.subLabel,
+                        picked,
+                        trueBubble: { px: pT.x, py: pT.y, pr: rImg },
+                        falseBubble: { px: pF.x, py: pF.y, pr: rImg }
+                    };
+                });
+                detectedData.part2.push({ qNum: q.qNum, subs });
+            });
+
+            // 4. Đọc Phần III
+            geo.part3Bubbles.forEach(q => {
+                let studentStr = '';
+                const colResults = [];
+                for (let c = 0; c < 4; c++) {
+                    const colBubbles = q.cols[c].map(b => {
+                        const pt = mapNormalizedToImagePoint(b.nx, b.ny, corners);
+                        const rImg = Math.max(2.5, b.pr * scaleX);
+                        const fill = measureBubbleFillScore(imgData, w, h, pt.x, pt.y, rImg);
+                        return { label: b.label, fill, px: pt.x, py: pt.y, pr: rImg };
+                    });
+                    const pickedList = colBubbles.filter(cb => cb.fill >= thresh);
+                    if (pickedList.length === 1) {
+                        studentStr += pickedList[0].label;
+                        colResults.push({ picked: pickedList[0], colBubbles });
+                    } else {
+                        colResults.push({ picked: null, colBubbles });
+                    }
+                }
+                detectedData.part3.push({ qNum: q.qNum, studentStr, colResults });
+            });
+
+            // 5. Tính điểm theo cấu hình thang điểm & vẽ kết quả
+            const evalRes = evaluateStudentAnswers(detectedData, detectedCode);
+            const scoreStr = `${evalRes.score.toFixed(2)}/${evalRes.maxPossibleScore.toFixed(2)}`;
+            const previewDataUrl = renderGradedOverlayCanvas(sourceCanvas, evalRes.overlays, detectedCode, scoreStr);
+
+            const elapsed = Math.round(performance.now() - t0);
+            const resultId = Date.now() + Math.floor(Math.random() * 1000);
+
+            const record = {
+                id: resultId,
+                studentName: `${labelPrefix} #${appState.results.length + 1}`,
+                examCode: detectedCode,
+                correctCount: evalRes.correctCount,
+                totalQuestions: evalRes.totalQuestions,
+                score: evalRes.score,
+                maxScore: evalRes.maxPossibleScore,
+                wrongSummary: evalRes.wrongDetails.length > 0 ? evalRes.wrongDetails.slice(0, 6).join(', ') + (evalRes.wrongDetails.length > 6 ? '...' : '') : 'Chính xác tuyệt đối',
+                detectedData,
+                previewDataUrl
+            };
+
+            appState.results.unshift(record);
+            lastGradedContext = {
+                recordId: resultId,
+                sourceCanvas,
+                detectedData
+            };
+
+            saveAppState();
+            updateLatestGradeCard(record, ocrRes, elapsed, evalRes.wrongDetails);
+            renderResultsTable();
+            playBeepSound();
+
+            return record;
+        }
+
+        function updateLatestGradeCard(record, ocrRes, elapsedMs, wrongDetails) {
+            document.getElementById('latestScoreDisplay').textContent = `${record.score.toFixed(2)} đ`;
+            document.getElementById('latestAccuracyDisplay').textContent =
+                `Thang ${record.maxScore.toFixed(2)}đ • Đúng ${record.correctCount}/${record.totalQuestions} câu • Mã đề ${record.examCode}`;
+
+            document.getElementById('latestCodeQuickInput').value = record.examCode;
+            const badge = document.getElementById('ocrConfidenceBadge');
+            badge.textContent = `${ocrRes.source} (${ocrRes.confidence})`;
+            badge.className = ocrRes.confidence === 'Cao' || ocrRes.confidence === 'Trung bình'
+                ? 'text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-[#059669]'
+                : 'text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800';
+
+            document.getElementById('latestProcessTime').textContent = `${elapsedMs} ms`;
+            document.getElementById('latestBreakdownBox').innerHTML = `
+                <div class="font-bold text-slate-800 flex items-center justify-between">
+                    <span>Chi tiết nhận diện (${record.studentName}):</span>
+                    <span class="text-[#1e3a8a]">Mã đề ${record.examCode}</span>
+                </div>
+                <div class="text-slate-600 leading-relaxed">
+                    ${wrongDetails.length === 0
+                        ? '<span class="text-[#059669] font-semibold">✓ Tuyệt vời! Không có câu nào sai hoặc tô đúp.</span>'
+                        : `<span class="text-[#dc2626] font-semibold">Các câu cần lưu ý:</span> ${wrongDetails.join('; ')}`}
+                </div>
+            `;
+        }
+
+        // Áp dụng sửa tay Mã đề ngay trên thẻ kết quả vừa chấm
+        function applyManualCodeOverride() {
+            const newCode = document.getElementById('latestCodeQuickInput').value.trim();
+            if (!newCode) {
+                showToast('Vui lòng nhập Mã đề hợp lệ!');
+                return;
+            }
+            if (!lastGradedContext) {
+                showToast('Chưa có bài chấm nào để cập nhật!');
+                return;
+            }
+
+            const rec = appState.results.find(r => r.id === lastGradedContext.recordId);
+            if (!rec) return;
+
+            const evalRes = evaluateStudentAnswers(lastGradedContext.detectedData, newCode);
+            const scoreStr = `${evalRes.score.toFixed(2)}/${evalRes.maxPossibleScore.toFixed(2)}`;
+            const newPreview = renderGradedOverlayCanvas(lastGradedContext.sourceCanvas, evalRes.overlays, newCode, scoreStr);
+
+            rec.examCode = newCode;
+            rec.score = evalRes.score;
+            rec.maxScore = evalRes.maxPossibleScore;
+            rec.correctCount = evalRes.correctCount;
+            rec.wrongSummary = evalRes.wrongDetails.length > 0 ? evalRes.wrongDetails.slice(0, 6).join(', ') : 'Chính xác tuyệt đối';
+            rec.previewDataUrl = newPreview;
+
+            saveAppState();
+            updateLatestGradeCard(rec, { source: 'Đã sửa tay', confidence: 'Cao' }, 5, evalRes.wrongDetails);
+            renderResultsTable();
+            showToast(`Đã cập nhật sang Mã đề ${newCode} và tính lại điểm!`);
+        }
+
+        // Tính lại toàn bộ bảng điểm khi giáo viên đổi thang điểm
+        function recalculateAllExistingResults() {
+            if (appState.results.length === 0) {
+                showToast('Đã lưu cấu hình thang điểm mới!');
+                return;
+            }
+            let updated = 0;
+            appState.results.forEach(rec => {
+                if (rec.detectedData) {
+                    const evalRes = evaluateStudentAnswers(rec.detectedData, rec.examCode);
+                    rec.score = evalRes.score;
+                    rec.maxScore = evalRes.maxPossibleScore;
+                    rec.correctCount = evalRes.correctCount;
+                    rec.wrongSummary = evalRes.wrongDetails.length > 0 ? evalRes.wrongDetails.slice(0, 6).join(', ') : 'Chính xác tuyệt đối';
+                    updated++;
+                }
+            });
+            saveAppState();
+            renderResultsTable();
+            showToast(`Đã tính lại điểm cho ${updated} bài theo thang điểm mới!`);
+        }
+
+        // =========================================================================
+        // 5. CAMERA TRỰC TIẾP, TẢI ẢNH HÀNG LOẠT & CHẤM THỬ MẪU GIẢ LẬP
+        // =========================================================================
+        async function toggleCamera() {
+            const panel = document.getElementById('cameraPanel');
+            const video = document.getElementById('cameraVideo');
+            const btnText = document.getElementById('btnCameraText');
+
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(t => t.stop());
+                cameraStream = null;
+                if (autoCaptureTimer) {
+                    clearInterval(autoCaptureTimer);
+                    autoCaptureTimer = null;
+                }
+                panel.classList.add('hidden');
+                btnText.textContent = 'Bật Camera trực tiếp';
+                return;
+            }
+
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: currentFacingMode, width: { ideal: 1920 }, height: { ideal: 1080 } },
+                    audio: false
+                });
+                video.srcObject = cameraStream;
+                panel.classList.remove('hidden');
+                btnText.textContent = 'Tắt Camera';
+                showToast('Camera đã sẵn sàng! Hãy căn 4 ô vuông đen vào khung.');
+            } catch (err) {
+                showToast('Không thể mở Camera (kiểm tra quyền truy cập hoặc kết nối HTTPS).');
+            }
+        }
+
+        async function switchCameraDevice() {
+            currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+            if (cameraStream) {
+                await toggleCamera();
+                await toggleCamera();
+            }
+        }
+
+        async function captureAndGradeFromCamera() {
+            const video = document.getElementById('cameraVideo');
+            if (!video || !video.videoWidth) return;
+            const capCanvas = document.createElement('canvas');
+            capCanvas.width = video.videoWidth;
+            capCanvas.height = video.videoHeight;
+            capCanvas.getContext('2d').drawImage(video, 0, 0);
+            await processAndGradeCanvasImage(capCanvas, 'Camera');
+        }
+
+        document.getElementById('autoCaptureCheck').addEventListener('change', (e) => {
+            if (e.target.checked) {
+                autoCaptureTimer = setInterval(() => {
+                    if (cameraStream) captureAndGradeFromCamera();
+                }, 2500);
+                showToast('Đã bật chế độ tự động chụp mỗi 2.5 giây');
+            } else if (autoCaptureTimer) {
+                clearInterval(autoCaptureTimer);
+                autoCaptureTimer = null;
+            }
+        });
+
+        async function handleBatchImageUpload(event) {
+            const files = Array.from(event.target.files || []);
+            if (files.length === 0) return;
+
+            showToast(`Đang xử lý ${files.length} ảnh phiếu...`);
+            for (const file of files) {
+                await new Promise(resolve => {
+                    const img = new Image();
+                    img.onload = async () => {
+                        const c = document.createElement('canvas');
+                        c.width = img.width;
+                        c.height = img.height;
+                        c.getContext('2d').drawImage(img, 0, 0);
+                        const baseName = file.name.replace(/\.[^/.]+$/, '');
+                        await processAndGradeCanvasImage(c, baseName);
+                        URL.revokeObjectURL(img.src);
+                        resolve();
+                    };
+                    img.onerror = resolve;
+                    img.src = URL.createObjectURL(file);
+                });
+            }
+            event.target.value = '';
+            showToast(`Hoàn tất chấm ${files.length} phiếu!`);
+        }
+
+        async function runSimulatedSampleGrade() {
+            // Đảm bảo có đáp án để đối chiếu
+            const keyObj = getCurrentKeyObj();
+            const hasAnyKey = Object.values(keyObj.part1).some(Boolean)
+                || Object.keys(keyObj.part2).length > 0
+                || Object.values(keyObj.part3).some(Boolean);
+            if (!hasAnyKey) {
+                generateRandomAnswerKey();
+            }
+
+            const curKey = getCurrentKeyObj();
+            const opts = ['A', 'B', 'C', 'D'];
+            const sampleFill = {
+                examCode: appState.grading.selectedCode,
+                part1: {},
+                part2: {},
+                part3: {}
+            };
+
+            // Tạo bài làm mẫu đúng ~85% để kiểm thử trực quan
+            for (let q = 1; q <= appState.config.part1Count; q++) {
+                const truth = curKey.part1[q] || 'A';
+                sampleFill.part1[q] = Math.random() < 0.85 ? truth : opts[(opts.indexOf(truth) + 1) % 4];
+            }
+            for (let q = 1; q <= appState.config.part2Count; q++) {
+                const tObj = curKey.part2[q] || { a: 'Đ', b: 'S', c: 'Đ', d: 'S' };
+                sampleFill.part2[q] = {
+                    a: Math.random() < 0.85 ? tObj.a : (tObj.a === 'Đ' ? 'S' : 'Đ'),
+                    b: Math.random() < 0.85 ? tObj.b : (tObj.b === 'Đ' ? 'S' : 'Đ'),
+                    c: Math.random() < 0.85 ? tObj.c : (tObj.c === 'Đ' ? 'S' : 'Đ'),
+                    d: Math.random() < 0.85 ? tObj.d : (tObj.d === 'Đ' ? 'S' : 'Đ')
+                };
+            }
+            for (let q = 1; q <= appState.config.part3Count; q++) {
+                const tStr = curKey.part3[q] || '12';
+                sampleFill.part3[q] = Math.random() < 0.85 ? tStr : '99';
+            }
+
+            const simCanvas = document.createElement('canvas');
+            renderSingleOmrSheetToCanvas(simCanvas, appState.config, sampleFill);
+            await processAndGradeCanvasImage(simCanvas, 'Phiếu mẫu');
+        }
+
+        // =========================================================================
+        // 6. BẢNG ĐIỂM, SỬA TÊN THÍ SINH & XUẤT EXCEL CHUẨN TIẾNG VIỆT
+        // =========================================================================
+        function renderResultsTable() {
+            const tbody = document.getElementById('resultsTableBody');
+            document.getElementById('gradedCountBadge').textContent = `${appState.results.length} bài`;
+
+            if (appState.results.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="py-8 text-center text-slate-400 italic">
+                            Chưa có dữ liệu bài chấm. Hãy chấm thử hoặc tải ảnh phiếu bài làm lên.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = appState.results.map((r, idx) => `
+                <tr class="hover:bg-blue-50/40 transition">
+                    <td class="py-2.5 px-4 font-mono-code font-bold text-slate-500">${idx + 1}</td>
+                    <td class="py-2.5 px-4">
+                        <input type="text" value="${escapeHtml(r.studentName)}" onchange="updateResultStudentName(${r.id}, this.value)"
+                            class="w-full max-w-[210px] rounded border border-transparent hover:border-slate-300 focus:border-[#1e3a8a] bg-transparent focus:bg-white px-2 py-1 font-semibold text-slate-800 focus:outline-none">
+                    </td>
+                    <td class="py-2.5 px-4 font-mono-code font-bold text-[#1e3a8a]">${escapeHtml(r.examCode)}</td>
+                    <td class="py-2.5 px-4 font-semibold text-slate-700">${r.correctCount}/${r.totalQuestions}</td>
+                    <td class="py-2.5 px-4 text-xs text-slate-500 max-w-[240px] truncate" title="${escapeHtml(r.wrongSummary)}">
+                        ${escapeHtml(r.wrongSummary)}
+                    </td>
+                    <td class="py-2.5 px-4 text-right font-mono-code font-extrabold text-sm text-[#059669]">
+                        ${Number(r.score).toFixed(2)}
+                    </td>
+                    <td class="py-2.5 px-4 text-center">
+                        <div class="inline-flex items-center gap-1">
+                            ${r.previewDataUrl ? `
+                                <button type="button" onclick="openReviewModal(${r.id})" title="Xem ảnh phiếu đã chấm"
+                                    class="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#1e3a8a] cursor-pointer">
+                                    <i data-lucide="eye" class="w-4 h-4"></i>
+                                </button>
+                            ` : ''}
+                            <button type="button" onclick="deleteResultRow(${r.id})" title="Xóa dòng này"
+                                class="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-[#dc2626] cursor-pointer">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+
+            lucide.createIcons();
+        }
+
+        function updateResultStudentName(id, newName) {
+            const r = appState.results.find(x => x.id === id);
+            if (r) {
+                r.studentName = newName.trim() || r.studentName;
+                saveAppState();
+            }
+        }
+
+        function deleteResultRow(id) {
+            appState.results = appState.results.filter(x => x.id !== id);
+            saveAppState();
+            renderResultsTable();
+        }
+
+        function clearAllResults() {
+            appState.results = [];
+            lastGradedContext = null;
+            saveAppState();
+            renderResultsTable();
+            showToast('Đã xóa toàn bộ bảng điểm!');
+        }
+
+        function openReviewModal(id) {
+            const r = appState.results.find(x => x.id === id);
+            if (!r || !r.previewDataUrl) return;
+            document.getElementById('reviewModalTitle').textContent = `${r.studentName} • Mã đề ${r.examCode} • Điểm: ${Number(r.score).toFixed(2)}`;
+            document.getElementById('reviewModalImg').src = r.previewDataUrl;
+            document.getElementById('reviewModal').classList.remove('hidden');
+        }
+
+        function closeReviewModal() {
+            document.getElementById('reviewModal').classList.add('hidden');
+        }
+
+        function exportResultsToExcel() {
+            if (appState.results.length === 0) {
+                showToast('Chưa có bài chấm nào để xuất Excel!');
+                return;
+            }
+            const headers = ['STT', 'Họ và tên / Mã bài', 'Mã đề', 'Số câu đúng', 'Tổng số câu', 'Điểm số', 'Thang điểm', 'Chi tiết sai'];
+            const rows = appState.results.map((r, i) => [
+                i + 1,
+                `"${(r.studentName || '').replace(/"/g, '""')}"`,
+                `"${r.examCode}"`,
+                r.correctCount,
+                r.totalQuestions,
+                Number(r.score).toFixed(2).replace('.', ','),
+                Number(r.maxScore || 10).toFixed(2).replace('.', ','),
+                `"${(r.wrongSummary || '').replace(/"/g, '""')}"`
+            ]);
+
+            const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\r\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Bang_Diem_Trac_Nghiem_${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('Đã xuất bảng điểm Excel (.csv chuẩn UTF-8)!');
+        }
+
+        function escapeHtml(str) {
+            return String(str || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        // =========================================================================
+        // 7. LẮNG NGHE SỰ KIỆN ĐIỀU KHIỂN & TẢI APP ĐỘC LẬP
+        // =========================================================================
+        function bindAllInputsToState() {
+            document.getElementById('presetSelect').value = appState.config.preset;
+            document.getElementById('numPart1').value = appState.config.part1Count;
+            document.getElementById('numPart2').value = appState.config.part2Count;
+            document.getElementById('numPart3').value = appState.config.part3Count;
+            document.getElementById('paperSizeSelect').value = appState.config.paperMode || 'AUTO';
+            document.getElementById('twoUpA4Checkbox').checked = appState.config.twoUpA4 !== false;
+            document.getElementById('examCodeDigitsSelect').value = String(appState.config.codeDigits || 3);
+            document.getElementById('schoolInput').value = appState.config.schoolName;
+            document.getElementById('examTitleInput').value = appState.config.examTitle;
+            document.getElementById('subjectInput').value = appState.config.subjectName;
+            document.getElementById('durationInput').value = appState.config.duration;
+
+            document.getElementById('thresholdSlider').value = appState.grading.threshold;
+            document.getElementById('thresholdLabel').textContent = `${appState.grading.threshold}%`;
+            document.getElementById('soundToggle').checked = appState.grading.soundEnabled;
+            document.getElementById('geminiOcrToggle').checked = appState.grading.geminiOcrEnabled !== false;
+            document.getElementById('geminiApiKeyInput').value = appState.grading.geminiApiKey || '';
+
+            renderResultsTable();
+        }
+
+        document.getElementById('presetSelect').addEventListener('change', (e) => {
+            const val = e.target.value;
+            appState.config.preset = val;
+            if (val === '40abcd') {
+                appState.config.part1Count = 40;
+                appState.config.part2Count = 0;
+                appState.config.part3Count = 0;
+            } else if (val === '50abcd') {
+                appState.config.part1Count = 50;
+                appState.config.part2Count = 0;
+                appState.config.part3Count = 0;
+            } else if (val === 'bgd2025') {
+                appState.config.part1Count = 12;
+                appState.config.part2Count = 4;
+                appState.config.part3Count = 6;
+            }
+            document.getElementById('numPart1').value = appState.config.part1Count;
+            document.getElementById('numPart2').value = appState.config.part2Count;
+            document.getElementById('numPart3').value = appState.config.part3Count;
+            refreshOmrDesignAndSync();
+        });
+
+        ['numPart1', 'numPart2', 'numPart3'].forEach(id => {
+            document.getElementById(id).addEventListener('input', () => {
+                appState.config.preset = 'custom';
+                document.getElementById('presetSelect').value = 'custom';
+                appState.config.part1Count = Math.max(0, Math.min(100, parseInt(document.getElementById('numPart1').value) || 0));
+                appState.config.part2Count = Math.max(0, Math.min(10, parseInt(document.getElementById('numPart2').value) || 0));
+                appState.config.part3Count = Math.max(0, Math.min(10, parseInt(document.getElementById('numPart3').value) || 0));
+                refreshOmrDesignAndSync();
+            });
+        });
+
+        document.getElementById('paperSizeSelect').addEventListener('change', (e) => {
+            appState.config.paperMode = e.target.value;
+            refreshOmrDesignAndSync();
+        });
+
+        document.getElementById('twoUpA4Checkbox').addEventListener('change', (e) => {
+            appState.config.twoUpA4 = e.target.checked;
+            refreshOmrDesignAndSync();
+        });
+
+        document.getElementById('examCodeDigitsSelect').addEventListener('change', (e) => {
+            appState.config.codeDigits = parseInt(e.target.value) || 3;
+            refreshOmrDesignAndSync();
+        });
+
+        document.getElementById('schoolInput').addEventListener('input', (e) => {
+            appState.config.schoolName = e.target.value;
+            refreshOmrDesignAndSync();
+        });
+
+        document.getElementById('examTitleInput').addEventListener('input', (e) => {
+            appState.config.examTitle = e.target.value;
+            refreshOmrDesignAndSync();
+        });
+
+        document.getElementById('subjectInput').addEventListener('input', (e) => {
+            appState.config.subjectName = e.target.value;
+            refreshOmrDesignAndSync();
+        });
+
+        document.getElementById('durationInput').addEventListener('input', (e) => {
+            appState.config.duration = e.target.value;
+            refreshOmrDesignAndSync();
+        });
+
+        document.getElementById('quickKeyStringInput').addEventListener('input', (e) => {
+            const clean = e.target.value.toUpperCase().replace(/[^ABCD-]/g, '');
+            const keyObj = getCurrentKeyObj();
+            for (let q = 1; q <= appState.config.part1Count; q++) {
+                const ch = clean[q - 1];
+                keyObj.part1[q] = (ch && 'ABCD'.includes(ch)) ? ch : '';
+            }
+            saveAppState();
+            syncGradingTabUI();
+        });
+
+        ['ptsPart1Input', 'ptsPart2Input', 'ptsPart3Input'].forEach((id, idx) => {
+            document.getElementById(id).addEventListener('input', (e) => {
+                const val = Math.max(0, parseFloat(e.target.value) || 0);
+                appState.grading.scorePreset = 'custom';
+                if (idx === 0) appState.grading.ptsPart1 = val;
+                if (idx === 1) appState.grading.ptsPart2 = val;
+                if (idx === 2) appState.grading.ptsPart3 = val;
+                saveAppState();
+                updateConfiguredScoreSummary();
+            });
+        });
+
+        document.getElementById('part2ModeSelect').addEventListener('change', (e) => {
+            appState.grading.part2Mode = e.target.value;
+            saveAppState();
+        });
+
+        document.getElementById('thresholdSlider').addEventListener('input', (e) => {
+            appState.grading.threshold = parseInt(e.target.value) || 45;
+            document.getElementById('thresholdLabel').textContent = `${appState.grading.threshold}%`;
+            saveAppState();
+        });
+
+        document.getElementById('soundToggle').addEventListener('change', (e) => {
+            appState.grading.soundEnabled = e.target.checked;
+            saveAppState();
+        });
+
+        document.getElementById('geminiOcrToggle').addEventListener('change', (e) => {
+            appState.grading.geminiOcrEnabled = e.target.checked;
+            saveAppState();
+            showToast(e.target.checked ? 'Đã bật Gemini AI đọc chữ viết tay Mã đề!' : 'Đã chuyển sang chế độ đọc Mã đề Offline.');
+        });
+
+        document.getElementById('geminiApiKeyInput').addEventListener('input', (e) => {
+            appState.grading.geminiApiKey = e.target.value.trim();
+            saveAppState();
+        });
+
+        function downloadStandaloneAppHtml() {
+            try {
+                const fullHtml = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+                const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'Cham_Thi_Trac_Nghiem_PhamHau_Edu.html';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast('Đã tải file Cham_Thi_Trac_Nghiem_PhamHau_Edu.html về máy!');
+            } catch (err) {
+                showToast('Lỗi khi tải file, hãy dùng nút Copy ở góc phải khung code.');
+            }
+        }
+
+        function playBeepSound() {
+            if (!appState.grading.soundEnabled) return;
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.14);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.14);
+            } catch (e) {
+                // Bỏ qua nếu trình duyệt chặn âm thanh tự động
+            }
+        }
+
+        window.onload = () => {
+            lucide.createIcons();
+            bindAllInputsToState();
+            refreshOmrDesignAndSync();
+        };
+    </script>
+</body>
+</html>

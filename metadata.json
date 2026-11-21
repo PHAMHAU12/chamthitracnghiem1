@@ -1,0 +1,6 @@
+{
+  "name": "Chấm Thi Trắc Nghiệm Thông Minh — Phạm Hậu EDU",
+  "description": "Hệ thống thiết kế phiếu OMR tùy biến (A4/A5 ghép đôi), nhận diện mã đề viết tay bằng Gemini AI và chấm điểm trắc nghiệm tự động chuẩn tọa độ.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
